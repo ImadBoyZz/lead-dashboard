@@ -28,6 +28,7 @@ import { LEAD_STATUS_OPTIONS } from "@/lib/constants";
 import { StatusChanger } from "./status-changer";
 import { AddNote } from "./add-note";
 import { CopyButton } from "./copy-button";
+import { ScanButton } from "./scan-button";
 import type { ScoreBreakdown } from "@/types";
 
 interface PageProps {
@@ -291,6 +292,9 @@ export default async function LeadDetailPage({ params }: PageProps) {
 
         {/* Right column */}
         <div className="space-y-6">
+          {/* Scan Website */}
+          <ScanButton businessId={business.id} hasWebsite={!!business.website} />
+
           {/* Score */}
           <Card title="Score">
             <div className="text-center mb-4">
