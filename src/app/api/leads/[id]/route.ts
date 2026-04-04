@@ -1,0 +1,230 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { eq, desc } from 'drizzle-orm';
+import { db } from '@/lib/db';
+import * as schema from '@/lib/db/schema';
+
+type RouteContext = { params: Promise<{ id: string }> };
+
+// ── GET: Full lead detail ─────────────────────────────
+
+export async function GET(
+  _request: NextRequest,
+  context: RouteContext,
+) {
+  try {
+    const { id } = await context.params;
+
+    // Fetch business with joins
+    const [result] = await db
+      .select({
+        business: schema.businesses,
+        audit: schema.auditResults,
+        score: schema.leadScores,
+        status: schema.leadStatuses,
+      })
+      .from(schema.businesses)
+      .leftJoin(
+        schema.auditResults,
+        eq(schema.businesses.id, schema.auditResults.businessId),
+      )
+      .leftJoin(
+        schema.leadScores,
+        eq(schema.businesses.id, schema.leadScores.businessId),
+      )
+      .leftJoin(
+        schema.leadStatuses,
+        eq(schema.businesses.id, schema.leadStatuses.businessId),
+      )
+      .where(eq(schema.businesses.id, id))
+      .limit(1);
+
+    if (!result) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+    }
+
+    // Fetch notes
+    const leadNotes = await db
+      .select()
+      .from(schema.notes)
+      .where(eq(schema.notes.businessId, id))
+      .orderBy(desc(schema.notes.createdAt));
+
+    // Fetch status history
+    const history = await db
+      .select()
+      .from(schema.statusHistory)
+      .where(eq(schema.statusHistory.businessId, id))
+      .orderBy(desc(schema.statusHistory.changedAt));
+
+    return NextResponse.json({
+      ...result.business,
+      audit: result.audit,
+      score: result.score,
+      status: result.status,
+      notes: leadNotes,
+      statusHistory: history,
+    });
+  } catch (error) {
+    console.error('Lead GET error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 },
+    );
+  }
+}
+
+// ── PATCH: Update lead ────────────────────────────────
+
+const patchSchema = z.object({
+  status: z
+    .enum([
+      'new',
+      'contacted',
+      'replied',
+      'meeting',
+      'won',
+      'lost',
+      'disqualified',
+    ])
+    .optional(),
+  note: z.string().optional(),
+  optOut: z.boolean().optional(),
+});
+
+export async function PATCH(
+  request: NextRequest,
+  context: RouteContext,
+) {
+  try {
+    const { id } = await context.params;
+    const body = await request.json();
+    const parsed = patchSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.flatten() },
+        { status: 400 },
+      );
+    }
+
+    const { status, note, optOut } = parsed.data;
+
+    // Verify business exists
+    const [business] = await db
+      .select({ id: schema.businesses.id })
+      .from(schema.businesses)
+      .where(eq(schema.businesses.id, id))
+      .limit(1);
+
+    if (!business) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+    }
+
+    // Handle status change
+    if (status) {
+      // Get current status
+      const [currentStatus] = await db
+        .select({ status: schema.leadStatuses.status })
+        .from(schema.leadStatuses)
+        .where(eq(schema.leadStatuses.businessId, id))
+        .limit(1);
+
+      const fromStatus = currentStatus?.status ?? null;
+
+      // Build update fields
+      const statusUpdate: Record<string, unknown> = {
+        status,
+        statusChangedAt: new Date(),
+      };
+
+      if (status === 'contacted') statusUpdate.contactedAt = new Date();
+      if (status === 'replied') statusUpdate.repliedAt = new Date();
+      if (status === 'meeting') statusUpdate.meetingAt = new Date();
+      if (status === 'won' || status === 'lost') statusUpdate.closedAt = new Date();
+
+      await db
+        .update(schema.leadStatuses)
+        .set(statusUpdate)
+        .where(eq(schema.leadStatuses.businessId, id));
+
+      // Insert status history
+      await db.insert(schema.statusHistory).values({
+        businessId: id,
+        fromStatus,
+        toStatus: status,
+      });
+    }
+
+    // Handle note
+    if (note) {
+      await db.insert(schema.notes).values({
+        businessId: id,
+        content: note,
+      });
+    }
+
+    // Handle opt-out
+    if (optOut !== undefined) {
+      await db
+        .update(schema.businesses)
+        .set({
+          optOut,
+          optOutAt: optOut ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.businesses.id, id));
+    }
+
+    // Return updated lead
+    const [updated] = await db
+      .select({
+        business: schema.businesses,
+        audit: schema.auditResults,
+        score: schema.leadScores,
+        leadStatus: schema.leadStatuses,
+      })
+      .from(schema.businesses)
+      .leftJoin(
+        schema.auditResults,
+        eq(schema.businesses.id, schema.auditResults.businessId),
+      )
+      .leftJoin(
+        schema.leadScores,
+        eq(schema.businesses.id, schema.leadScores.businessId),
+      )
+      .leftJoin(
+        schema.leadStatuses,
+        eq(schema.businesses.id, schema.leadStatuses.businessId),
+      )
+      .where(eq(schema.businesses.id, id))
+      .limit(1);
+
+    const leadNotes = await db
+      .select()
+      .from(schema.notes)
+      .where(eq(schema.notes.businessId, id))
+      .orderBy(desc(schema.notes.createdAt));
+
+    const history = await db
+      .select()
+      .from(schema.statusHistory)
+      .where(eq(schema.statusHistory.businessId, id))
+      .orderBy(desc(schema.statusHistory.changedAt));
+
+    return NextResponse.json({
+      ...updated.business,
+      audit: updated.audit,
+      score: updated.score,
+      status: updated.leadStatus,
+      notes: leadNotes,
+      statusHistory: history,
+    });
+  } catch (error) {
+    console.error('Lead PATCH error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 },
+    );
+  }
+}
