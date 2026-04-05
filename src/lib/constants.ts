@@ -44,3 +44,32 @@ export const SORT_OPTIONS = [
   { value: 'founded', label: 'Oprichtingsdatum' },
   { value: 'recent', label: 'Recent toegevoegd' },
 ] as const;
+
+export const PIPELINE_STAGE_OPTIONS = [
+  { value: 'new', label: 'Nieuw', color: 'bg-blue-100 text-blue-700' },
+  { value: 'researching', label: 'Onderzoek', color: 'bg-cyan-100 text-cyan-700' },
+  { value: 'contacted', label: 'Gecontacteerd', color: 'bg-yellow-100 text-yellow-700' },
+  { value: 'replied', label: 'Gereageerd', color: 'bg-purple-100 text-purple-700' },
+  { value: 'meeting_booked', label: 'Meeting Gepland', color: 'bg-indigo-100 text-indigo-700' },
+  { value: 'proposal_sent', label: 'Voorstel Verstuurd', color: 'bg-orange-100 text-orange-700' },
+  { value: 'negotiating', label: 'Onderhandeling', color: 'bg-amber-100 text-amber-700' },
+  { value: 'won', label: 'Gewonnen', color: 'bg-green-100 text-green-700' },
+  { value: 'lost', label: 'Verloren', color: 'bg-red-100 text-red-700' },
+  { value: 'not_qualified', label: 'Niet Gekwalificeerd', color: 'bg-gray-100 text-gray-700' },
+  { value: 'nurture', label: 'Nurture', color: 'bg-teal-100 text-teal-700' },
+] as const;
+
+export const OUTREACH_CHANNEL_OPTIONS = [
+  { value: 'email', label: 'Email', icon: 'Mail' },
+  { value: 'phone', label: 'Telefoon', icon: 'Phone' },
+  { value: 'linkedin', label: 'LinkedIn', icon: 'Linkedin' },
+  { value: 'whatsapp', label: 'WhatsApp', icon: 'MessageCircle' },
+  { value: 'in_person', label: 'Persoonlijk', icon: 'Users' },
+] as const;
+
+export const PRIORITY_OPTIONS = [
+  { value: 'low', label: 'Laag', color: 'bg-gray-100 text-gray-600' },
+  { value: 'medium', label: 'Medium', color: 'bg-blue-100 text-blue-600' },
+  { value: 'high', label: 'Hoog', color: 'bg-orange-100 text-orange-600' },
+  { value: 'urgent', label: 'Urgent', color: 'bg-red-100 text-red-600' },
+] as const;

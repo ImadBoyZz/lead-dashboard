@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, KanbanSquare, Settings } from "lucide-react";
+import { Users, KanbanSquare, Settings, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ReminderBadge } from "@/components/reminders/reminder-badge";
 
 const navigation = [
   { name: "Leads", href: "/leads", icon: Users },
   { name: "Pipeline", href: "/pipeline", icon: KanbanSquare },
+  { name: "Reminders", href: "/reminders", icon: Bell },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -37,6 +39,7 @@ export function Sidebar() {
             >
               <item.icon className="h-4 w-4 shrink-0" />
               {item.name}
+              {item.name === "Reminders" && <ReminderBadge />}
             </Link>
           );
         })}

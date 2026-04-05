@@ -25,6 +25,9 @@ import { Card } from "@/components/ui/card";
 import { formatDate, getYearsInBusiness } from "@/lib/utils";
 import { getScoreColor, getScoreLabel } from "@/lib/scoring";
 import { LEAD_STATUS_OPTIONS } from "@/lib/constants";
+import { OutreachTimeline } from "@/components/outreach/outreach-timeline";
+import { OutreachForm } from "@/components/outreach/outreach-form";
+import { ReminderForm } from "@/components/reminders/reminder-form";
 import { StatusChanger } from "./status-changer";
 import { AddNote } from "./add-note";
 import { CopyButton } from "./copy-button";
@@ -287,6 +290,22 @@ export default async function LeadDetailPage({ params }: PageProps) {
                 <AddNote leadId={id} />
               </div>
             </div>
+          </Card>
+
+          {/* Outreach */}
+          <Card title="Outreach">
+            <div className="space-y-4">
+              <OutreachTimeline businessId={id} />
+              <div className="pt-4 border-t border-card-border">
+                <h4 className="text-sm font-medium text-foreground mb-3">Nieuwe outreach loggen</h4>
+                <OutreachForm businessId={id} />
+              </div>
+            </div>
+          </Card>
+
+          {/* Reminders */}
+          <Card title="Reminders">
+            <ReminderForm businessId={id} />
           </Card>
         </div>
 

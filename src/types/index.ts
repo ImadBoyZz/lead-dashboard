@@ -50,5 +50,5 @@ export type LeadFilters = {
 
 export type ScoreBreakdown = Record<
   string,
-  { points: number; reason: string }
+  { points: number; reason: string; dimension?: string }
 >;

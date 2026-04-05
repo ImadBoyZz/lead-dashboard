@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Pagination } from "@/components/ui/pagination";
 import { ScoreBadge } from "@/components/leads/score-badge";
+import { SmartImportButton } from "@/components/leads/smart-import-button";
 import { LeadFilters } from "@/components/leads/lead-filters";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { LEAD_STATUS_OPTIONS, ITEMS_PER_PAGE } from "@/lib/constants";
@@ -159,12 +160,15 @@ export default async function LeadsPage({ searchParams }: PageProps) {
         title="Leads"
         description={formatNumber(total) + " leads gevonden"}
         actions={
-          <a href={exportUrl}>
-            <Button variant="secondary" size="sm">
-              <Download className="h-4 w-4" />
-              CSV Export
-            </Button>
-          </a>
+          <div className="flex items-center gap-2">
+            <SmartImportButton />
+            <a href={exportUrl}>
+              <Button variant="secondary" size="sm">
+                <Download className="h-4 w-4" />
+                CSV Export
+              </Button>
+            </a>
+          </div>
         }
       />
 
