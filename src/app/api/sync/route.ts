@@ -29,7 +29,7 @@ const businessSchema = z.object({
   googlePlaceId: z.string().nullish(),
   googleRating: z.number().nullish(),
   googleReviewCount: z.number().nullish(),
-  dataSource: z.enum(['kbo_bulk', 'kvk_open', 'google_places', 'manual']),
+  dataSource: z.enum(['google_places', 'manual']),
 });
 
 const syncSchema = z.object({

@@ -19,8 +19,6 @@ import {
 export const countryEnum = pgEnum('country', ['BE', 'NL']);
 
 export const dataSourceEnum = pgEnum('data_source', [
-  'kbo_bulk',
-  'kvk_open',
   'google_places',
   'manual',
 ]);
@@ -157,8 +155,6 @@ export const leadScores = pgTable(
     maturityCluster: text('maturity_cluster'),
     disqualified: boolean('disqualified').default(false).notNull(),
     disqualifyReason: text('disqualify_reason'),
-    dataCompleteness: integer('data_completeness'),         // 0-100%, hoeveel scoring-inputs beschikbaar
-    estimatedScore: integer('estimated_score'),              // genormaliseerde score naar beschikbare data
     scoredAt: timestamp('scored_at').defaultNow().notNull(),
   },
   (table) => [index('lead_scores_total_score_idx').on(table.totalScore)],
@@ -277,72 +273,10 @@ export const statusHistoryRelations = relations(statusHistory, ({ one }) => ({
   }),
 }));
 
-// ── Fase 1: Nieuwe Enums ──────────────────────────────
-
-export const candidateStatusEnum = pgEnum('candidate_status', [
-  'pending',
-  'imported',
-  'skipped',
-]);
-
-// ── KBO Candidates (staging tabel) ────────────────────
-
-export const kboCandidates = pgTable(
-  'kbo_candidates',
-  {
-    id: uuid('id').defaultRandom().primaryKey(),
-    registryId: text('registry_id').notNull(),
-    name: text('name').notNull(),
-    legalForm: text('legal_form'),
-    naceCode: text('nace_code'),
-    foundedDate: date('founded_date'),
-    street: text('street'),
-    houseNumber: text('house_number'),
-    postalCode: text('postal_code').notNull(),
-    city: text('city'),
-    province: text('province'),
-    website: text('website'),
-    email: text('email'),
-    phone: text('phone'),
-    preScore: integer('pre_score').notNull().default(0),
-    scoreBreakdown: jsonb('score_breakdown').default(sql`'{}'::jsonb`),
-    googleReviewCount: integer('google_review_count'),
-    googleRating: real('google_rating'),
-    hasGoogleBusinessProfile: boolean('has_google_business_profile'),
-    googleBusinessStatus: text('google_business_status'),
-    enterpriseStatus: text('enterprise_status').default('AC'),
-    status: candidateStatusEnum('status').notNull().default('pending'),
-    importedAt: timestamp('imported_at'),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  },
-  (table) => [
-    uniqueIndex('kbo_candidates_registry_id_idx').on(table.registryId),
-    index('kbo_candidates_status_idx').on(table.status),
-    index('kbo_candidates_pre_score_idx').on(table.preScore),
-    index('kbo_candidates_nace_code_idx').on(table.naceCode),
-    index('kbo_candidates_postal_code_idx').on(table.postalCode),
-  ],
-);
-
-// ── Import Profiles ───────────────────────────────────
-
-export const importProfiles = pgTable('import_profiles', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  name: text('name').notNull(),
-  description: text('description'),
-  filters: jsonb('filters').notNull().default(sql`'{}'::jsonb`),
-  batchSize: integer('batch_size').notNull().default(20),
-  isDefault: boolean('is_default').notNull().default(false),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
-
 // ── Fase 2: Pipeline & Outreach Enums ─────────────────
 
 export const pipelineStageEnum = pgEnum('pipeline_stage', [
-  'new', 'researching', 'contacted', 'replied', 'meeting_booked',
-  'proposal_sent', 'negotiating', 'won', 'lost', 'not_qualified', 'nurture',
+  'new', 'contacted', 'meeting', 'won', 'ignored',
 ]);
 
 export const outreachChannelEnum = pgEnum('outreach_channel', [
@@ -457,9 +391,6 @@ export const outreachTemplates = pgTable('outreach_templates', {
 });
 
 // ── Nieuwe Relations ──────────────────────────────────
-
-export const kboCandidatesRelations = relations(kboCandidates, ({}) => ({}));
-export const importProfilesRelations = relations(importProfiles, ({}) => ({}));
 
 export const leadPipelineRelations = relations(leadPipeline, ({ one }) => ({
   business: one(businesses, {

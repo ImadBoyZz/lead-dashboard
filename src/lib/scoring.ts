@@ -57,8 +57,6 @@ export interface ScoreResult {
   breakdown: Record<string, { points: number; reason: string; dimension: string }>;
   maturityCluster: MaturityCluster;
   maturityMultiplier: number;
-  dataCompleteness: number;    // 0-100
-  estimatedScore: number;      // score genormaliseerd naar beschikbare data
 }
 
 // ── Dimension caps ────────────────────────────────────
@@ -146,11 +144,11 @@ export function computeScore(input: ScoreInput): ScoreResult {
   // ── Hard disqualifiers ──────────────────────────────
 
   if (business.optOut) {
-    return { totalScore: 0, disqualified: true, disqualifyReason: 'Opt-out', breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0, dataCompleteness: 0, estimatedScore: 0 };
+    return { totalScore: 0, disqualified: true, disqualifyReason: 'Opt-out', breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0 };
   }
 
   if (business.googleBusinessStatus === 'CLOSED_PERMANENTLY') {
-    return { totalScore: 0, disqualified: true, disqualifyReason: 'Permanent gesloten (Google)', breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0, dataCompleteness: 0, estimatedScore: 0 };
+    return { totalScore: 0, disqualified: true, disqualifyReason: 'Permanent gesloten (Google)', breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0 };
   }
 
   const hasGBP = business.hasGoogleBusinessProfile === true;
@@ -160,23 +158,23 @@ export function computeScore(input: ScoreInput): ScoreResult {
   // Alleen disqualificeren als we WETEN dat er geen GBP is (na enrichment),
   // niet wanneer de data gewoon ontbreekt (null = nog niet gecheckt)
   if (gbpExplicitlyAbsent && !hasWebsite) {
-    return { totalScore: 0, disqualified: true, disqualifyReason: 'Geen online aanwezigheid (geen website, geen Google profiel)', breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0, dataCompleteness: 0, estimatedScore: 0 };
+    return { totalScore: 0, disqualified: true, disqualifyReason: 'Geen online aanwezigheid (geen website, geen Google profiel)', breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0 };
   }
 
   // IT/tech sector = competitor
   if (business.naceCode && (business.naceCode.startsWith('620') || business.naceCode.startsWith('631'))) {
-    return { totalScore: 0, disqualified: true, disqualifyReason: 'IT/tech sector — concurrent', breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0, dataCompleteness: 0, estimatedScore: 0 };
+    return { totalScore: 0, disqualified: true, disqualifyReason: 'IT/tech sector — concurrent', breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0 };
   }
 
   // Te groot bedrijf (500+ Google reviews = enterprise/keten)
   if ((business.googleReviewCount ?? 0) > 500) {
-    return { totalScore: 0, disqualified: true, disqualifyReason: 'Te groot bedrijf (500+ Google reviews)', breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0, dataCompleteness: 0, estimatedScore: 0 };
+    return { totalScore: 0, disqualified: true, disqualifyReason: 'Te groot bedrijf (500+ Google reviews)', breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0 };
   }
 
   // Onbereikbare website (HTTP 4xx/5xx of timeout)
   if (audit?.websiteHttpStatus != null) {
     if (audit.websiteHttpStatus === 0 || audit.websiteHttpStatus >= 400) {
-      return { totalScore: 0, disqualified: true, disqualifyReason: `Website onbereikbaar (HTTP ${audit.websiteHttpStatus})`, breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0, dataCompleteness: 0, estimatedScore: 0 };
+      return { totalScore: 0, disqualified: true, disqualifyReason: `Website onbereikbaar (HTTP ${audit.websiteHttpStatus})`, breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0 };
     }
   }
 
@@ -194,7 +192,7 @@ export function computeScore(input: ScoreInput): ScoreResult {
     const hasSslCert = audit.hasSsl === true;
 
     if (hasModernFramework && hasGoodSpeed && hasSslCert) {
-      return { totalScore: 0, disqualified: true, disqualifyReason: 'Moderne professionele website — geen prospect', breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0, dataCompleteness: 0, estimatedScore: 0 };
+      return { totalScore: 0, disqualified: true, disqualifyReason: 'Moderne professionele website — geen prospect', breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0 };
     }
   }
 
@@ -537,27 +535,7 @@ export function computeScore(input: ScoreInput): ScoreResult {
   const rawScore = opportunity + activity + reachability + budget + spanning + momentum;
   const totalScore = Math.min(100, Math.round(rawScore * maturityMultiplier));
 
-  // Data completeness: hoeveel scoring-inputs zijn beschikbaar?
-  const completenessSignals = [
-    business.googleRating !== null,
-    business.googleReviewCount !== null,
-    business.hasGoogleBusinessProfile !== null,
-    business.googleBusinessStatus !== null,
-    business.googlePhotosCount !== null,
-    business.reviewVelocity !== null,
-    audit !== null,
-    audit?.pagespeedMobileScore !== null,
-    audit?.hasSsl !== null,
-    audit?.detectedCms !== null,
-  ];
-  const dataCompleteness = Math.round((completenessSignals.filter(Boolean).length / completenessSignals.length) * 100);
-
-  // Geschatte score: normaliseer naar wat we zouden scoren met volledige data
-  const estimatedScore = dataCompleteness > 0
-    ? Math.min(100, Math.round((totalScore / dataCompleteness) * 100))
-    : totalScore;
-
-  return { totalScore, disqualified: false, disqualifyReason: null, breakdown, maturityCluster, maturityMultiplier, dataCompleteness, estimatedScore };
+  return { totalScore, disqualified: false, disqualifyReason: null, breakdown, maturityCluster, maturityMultiplier };
 }
 
 // ── Display helpers ───────────────────────────────────

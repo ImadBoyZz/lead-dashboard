@@ -6,11 +6,11 @@ import {
   hasQueueCapacity,
   freezeLead,
   unfreezeLead,
-  markAsLost,
+  markAsIgnored,
   markAsWon,
 } from '@/lib/pipeline-logic';
 
-const CLOSED_STAGES = ['won', 'lost', 'not_qualified', 'nurture'] as const;
+const CLOSED_STAGES = ['won', 'ignored'] as const;
 
 /**
  * GET /api/leads/queue
@@ -83,9 +83,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, action: 'unfrozen' });
     }
 
-    case 'markLost':
-      await markAsLost(businessId, body.rejectionReason ?? 'other', body.lostReason);
-      return NextResponse.json({ success: true, action: 'lost' });
+    case 'markIgnored':
+      await markAsIgnored(businessId, body.rejectionReason ?? 'other', body.lostReason);
+      return NextResponse.json({ success: true, action: 'ignored' });
 
     case 'markWon':
       await markAsWon(businessId, body.wonValue ?? 0);

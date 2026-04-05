@@ -3,10 +3,9 @@ config({ path: '.env.local' });
 
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
-import { eq, sql, gt } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import * as schema from '../src/lib/db/schema';
 import { computeScore } from '../src/lib/scoring';
-import { computePreScore } from '../src/lib/pre-scoring';
 
 const sqlClient = neon(process.env.DATABASE_URL!);
 const db = drizzle(sqlClient, { schema });
@@ -103,85 +102,6 @@ async function main() {
   }
 
   console.log(`\nBusinesses done! Rescored: ${updated}, Errors: ${errors}`);
-
-  // ── Step 3-4: Rescore kboCandidates pre-scores (bulk SQL) ───────
-  console.log('\nRescoring kboCandidates in batches (bulk update)...');
-
-  const [{ count: totalCandidates }] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(schema.kboCandidates);
-
-  console.log(`Found ${totalCandidates} candidates to rescore.`);
-
-  let candidateUpdated = 0;
-  let candidateErrors = 0;
-  const FETCH_SIZE = 2000;
-  const UPDATE_BATCH = 50;  // concurrent updates per batch
-  let lastId = '00000000-0000-0000-0000-000000000000';
-
-  while (true) {
-    const batch = await db
-      .select({
-        id: schema.kboCandidates.id,
-        naceCode: schema.kboCandidates.naceCode,
-        legalForm: schema.kboCandidates.legalForm,
-        website: schema.kboCandidates.website,
-        email: schema.kboCandidates.email,
-        phone: schema.kboCandidates.phone,
-        foundedDate: schema.kboCandidates.foundedDate,
-        googleReviewCount: schema.kboCandidates.googleReviewCount,
-        googleRating: schema.kboCandidates.googleRating,
-        hasGoogleBusinessProfile: schema.kboCandidates.hasGoogleBusinessProfile,
-        googleBusinessStatus: schema.kboCandidates.googleBusinessStatus,
-        name: schema.kboCandidates.name,
-      })
-      .from(schema.kboCandidates)
-      .where(gt(schema.kboCandidates.id, lastId))
-      .orderBy(schema.kboCandidates.id)
-      .limit(FETCH_SIZE);
-
-    if (batch.length === 0) break;
-
-    // Process in concurrent sub-batches
-    for (let i = 0; i < batch.length; i += UPDATE_BATCH) {
-      const subBatch = batch.slice(i, i + UPDATE_BATCH);
-      const promises = subBatch.map(candidate => {
-        const preScoreResult = computePreScore({
-          naceCode: candidate.naceCode,
-          legalForm: candidate.legalForm,
-          website: candidate.website,
-          email: candidate.email,
-          phone: candidate.phone,
-          foundedDate: candidate.foundedDate,
-          googleReviewCount: candidate.googleReviewCount,
-          googleRating: candidate.googleRating,
-          hasGoogleBusinessProfile: candidate.hasGoogleBusinessProfile,
-          googleBusinessStatus: candidate.googleBusinessStatus,
-        });
-
-        return db
-          .update(schema.kboCandidates)
-          .set({
-            preScore: preScoreResult.totalScore,
-            scoreBreakdown: preScoreResult.breakdown,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.kboCandidates.id, candidate.id))
-          .then(() => { candidateUpdated++; })
-          .catch(err => {
-            candidateErrors++;
-            console.error(`\nError rescoring ${candidate.name}:`, err);
-          });
-      });
-
-      await Promise.all(promises);
-      process.stdout.write(`\rRescored candidates: ${candidateUpdated}/${totalCandidates}`);
-    }
-
-    lastId = batch[batch.length - 1].id;
-  }
-
-  console.log(`\nCandidates done! Rescored: ${candidateUpdated}, Errors: ${candidateErrors}`);
 }
 
 main().catch(console.error);

@@ -2,24 +2,18 @@ import { eq, and, notInArray, count, sql } from 'drizzle-orm';
 import { db } from './db';
 import * as schema from './db/schema';
 
-type PipelineStage = 'new' | 'researching' | 'contacted' | 'replied' | 'meeting_booked' | 'proposal_sent' | 'negotiating' | 'won' | 'lost' | 'not_qualified' | 'nurture';
+type PipelineStage = 'new' | 'contacted' | 'meeting' | 'won' | 'ignored';
 type RejectionReason = 'no_budget' | 'no_interest' | 'has_supplier' | 'bad_timing' | 'no_response' | 'other';
 
 const MAX_ACTIVE_LEADS = 15;
-const CLOSED_STAGES: PipelineStage[] = ['won', 'lost', 'not_qualified', 'nurture'];
+const CLOSED_STAGES: PipelineStage[] = ['won', 'ignored'];
 
 const STAGE_TO_STATUS: Record<string, string> = {
   new: 'new',
-  researching: 'new',
   contacted: 'contacted',
-  replied: 'replied',
-  meeting_booked: 'meeting',
-  proposal_sent: 'meeting',
-  negotiating: 'meeting',
+  meeting: 'meeting',
   won: 'won',
-  lost: 'lost',
-  not_qualified: 'disqualified',
-  nurture: 'contacted',
+  ignored: 'lost',
 };
 
 export async function updatePipelineStage(
@@ -46,11 +40,9 @@ export async function updatePipelineStage(
 
   if (newStage === 'contacted') {
     updateData.contactedAt = new Date();
-  } else if (newStage === 'replied') {
-    updateData.repliedAt = new Date();
-  } else if (newStage === 'meeting_booked') {
+  } else if (newStage === 'meeting') {
     updateData.meetingAt = new Date();
-  } else if (newStage === 'won' || newStage === 'lost' || newStage === 'not_qualified') {
+  } else if (newStage === 'won' || newStage === 'ignored') {
     updateData.closedAt = new Date();
   }
 
@@ -142,9 +134,9 @@ export async function unfreezeLead(businessId: string): Promise<boolean> {
 // ── Fase 3: Rejection tracking ──────────────────────
 
 /**
- * Markeer een lead als lost met gestructureerde reden.
+ * Markeer een lead als genegeerd met gestructureerde reden.
  */
-export async function markAsLost(
+export async function markAsIgnored(
   businessId: string,
   rejectionReason: RejectionReason,
   lostReasonDetail?: string,
@@ -155,7 +147,7 @@ export async function markAsLost(
     .where(eq(schema.leadPipeline.businessId, businessId))
     .limit(1);
 
-  await updatePipelineStage(businessId, 'lost', pipeline?.stage);
+  await updatePipelineStage(businessId, 'ignored', pipeline?.stage);
 
   await db
     .update(schema.leadPipeline)

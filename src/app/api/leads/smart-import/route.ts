@@ -1,48 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq, desc, count } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { buildCandidateFilters } from '@/lib/candidate-filters';
+import { discoverLeads, buildSearchQuery } from '@/lib/places-discovery';
 import { computeScore } from '@/lib/scoring';
-import { NACE_BLACKLIST_PREFIXES, LEGAL_FORM_EXCLUDE, SECTOR_TIERS } from '@/lib/nace-config';
 
-// Alle NACE prefixes uit tier A + B + C (zichtbaarheid + lokaal + professioneel)
-const SECTOR_WHITELIST = [
-  ...SECTOR_TIERS.A.prefixes,
-  ...SECTOR_TIERS.B.prefixes,
-  ...SECTOR_TIERS.C.prefixes,
-];
-
-const DEFAULT_FILTERS = {
-  naceWhitelist: [...SECTOR_WHITELIST],
-  naceBlacklist: [...NACE_BLACKLIST_PREFIXES],
-  legalFormExclude: [...LEGAL_FORM_EXCLUDE],
-  excludeBlacklisted: true,
-  excludeUnreachable: true,
-};
-
-// GET — Preview: count van beschikbare candidates
-export async function GET() {
+// GET — Preview: discover leads from Google Places, deduplicate, return without saving
+export async function GET(request: NextRequest) {
   try {
-    const filters = buildCandidateFilters({ ...DEFAULT_FILTERS });
-    const [result] = await db
-      .select({ count: count() })
-      .from(schema.kboCandidates)
-      .where(filters);
+    const { searchParams } = new URL(request.url);
+    const sector = searchParams.get('sector');
+    const city = searchParams.get('city');
 
-    // Breakdown per province
-    const byProvince = await db
-      .select({
-        province: schema.kboCandidates.province,
-        count: count(),
-      })
-      .from(schema.kboCandidates)
-      .where(filters)
-      .groupBy(schema.kboCandidates.province);
+    if (!sector || !city) {
+      return NextResponse.json(
+        { error: 'Missing required query params: sector and city' },
+        { status: 400 },
+      );
+    }
+
+    const query = buildSearchQuery(sector, city);
+    const { leads, fromMock } = await discoverLeads(query, 20);
+
+    // Deduplicate against existing businesses by googlePlaceId
+    const placeIds = leads.map((l) => l.placeId);
+    let existingPlaceIds = new Set<string>();
+
+    if (placeIds.length > 0) {
+      const existing = await db
+        .select({ googlePlaceId: schema.businesses.googlePlaceId })
+        .from(schema.businesses)
+        .where(inArray(schema.businesses.googlePlaceId, placeIds));
+
+      existingPlaceIds = new Set(
+        existing
+          .map((r) => r.googlePlaceId)
+          .filter((id): id is string => id !== null),
+      );
+    }
+
+    const newLeads = leads.filter((l) => !existingPlaceIds.has(l.placeId));
+    const alreadyImported = leads.length - newLeads.length;
 
     return NextResponse.json({
-      available: result.count,
-      byProvince,
+      leads: newLeads,
+      total: leads.length,
+      alreadyImported,
+      fromMock,
     });
   } catch (error) {
     console.error('Smart import preview error:', error);
@@ -50,75 +54,35 @@ export async function GET() {
   }
 }
 
-// POST — Import N candidates naar businesses tabel
+// POST — Import discovered leads into businesses + scoring + pipeline
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const importCount = body.count ?? 20;
-    const profileId = body.profileId as string | undefined;
-
-    // Load profile filters if specified
-    let profileFilters = {};
-    if (profileId) {
-      const [profile] = await db
-        .select()
-        .from(schema.importProfiles)
-        .where(eq(schema.importProfiles.id, profileId))
-        .limit(1);
-      if (profile) {
-        profileFilters = (profile.filters as Record<string, unknown>) ?? {};
-      }
-    }
-
-    const baseFilters = { ...DEFAULT_FILTERS, ...profileFilters };
-
-    // Tier-based quota: importeer eerst Tier A, dan B, dan C
-    const tierQuota = {
-      A: Math.round(importCount * 0.5),   // 50% Tier A (kappers, restaurants, garages)
-      B: Math.round(importCount * 0.25),   // 25% Tier B (bouw, vastgoed)
-      C: importCount - Math.round(importCount * 0.5) - Math.round(importCount * 0.25), // rest Tier C
+    const { sector, city, selectedPlaceIds, count = 25 } = body as {
+      sector: string;
+      city: string;
+      selectedPlaceIds?: string[];
+      count?: number;
     };
 
-    const candidates = [];
-    for (const [tier, quota] of Object.entries(tierQuota) as [string, number][]) {
-      const tierPrefixes = SECTOR_TIERS[tier as keyof typeof SECTOR_TIERS]?.prefixes;
-      if (!tierPrefixes || quota <= 0) continue;
-
-      const tierFilters = buildCandidateFilters({
-        ...baseFilters,
-        naceWhitelist: [...tierPrefixes],
-      });
-
-      const tierCandidates = await db
-        .select()
-        .from(schema.kboCandidates)
-        .where(tierFilters)
-        .orderBy(desc(schema.kboCandidates.preScore))
-        .limit(quota);
-
-      candidates.push(...tierCandidates);
+    if (!sector || !city) {
+      return NextResponse.json(
+        { error: 'Missing required fields: sector and city' },
+        { status: 400 },
+      );
     }
 
-    // Als een tier niet genoeg candidates heeft, vul aan met de volgende tier
-    if (candidates.length < importCount) {
-      const existingIds = new Set(candidates.map(c => c.id));
-      const fallbackFilters = buildCandidateFilters(baseFilters);
-      const fallback = await db
-        .select()
-        .from(schema.kboCandidates)
-        .where(fallbackFilters)
-        .orderBy(desc(schema.kboCandidates.preScore))
-        .limit(importCount - candidates.length + 10);
+    const query = buildSearchQuery(sector, city);
+    const { leads } = await discoverLeads(query, 20);
 
-      for (const c of fallback) {
-        if (!existingIds.has(c.id) && candidates.length < importCount) {
-          candidates.push(c);
-          existingIds.add(c.id);
-        }
-      }
-    }
+    // Filter by selectedPlaceIds if provided, otherwise take all up to count
+    let toImport = selectedPlaceIds
+      ? leads.filter((l) => selectedPlaceIds.includes(l.placeId))
+      : leads;
 
-    if (candidates.length === 0) {
+    toImport = toImport.slice(0, count);
+
+    if (toImport.length === 0) {
       return NextResponse.json({ imported: 0, duplicates: 0, total: 0 });
     }
 
@@ -126,112 +90,96 @@ export async function POST(request: NextRequest) {
     const [importLog] = await db
       .insert(schema.importLogs)
       .values({
-        source: 'kbo_bulk',
+        source: 'google_places',
         status: 'running',
-        totalRecords: candidates.length,
+        totalRecords: toImport.length,
       })
       .returning({ id: schema.importLogs.id });
 
     let imported = 0;
     let duplicates = 0;
 
-    for (const candidate of candidates) {
+    for (const lead of toImport) {
       const [result] = await db
         .insert(schema.businesses)
         .values({
-          registryId: candidate.registryId,
+          registryId: lead.placeId,
           country: 'BE',
-          name: candidate.name,
-          legalForm: candidate.legalForm,
-          naceCode: candidate.naceCode,
-          foundedDate: candidate.foundedDate,
-          street: candidate.street,
-          houseNumber: candidate.houseNumber,
-          postalCode: candidate.postalCode,
-          city: candidate.city,
-          province: candidate.province,
-          website: candidate.website,
-          email: candidate.email,
-          phone: candidate.phone,
-          dataSource: 'kbo_bulk',
+          name: lead.name,
+          city: city,
+          website: lead.website,
+          phone: lead.phone,
+          googlePlaceId: lead.placeId,
+          googleRating: lead.rating,
+          googleReviewCount: lead.reviewCount,
+          googleBusinessStatus: lead.businessStatus,
+          googlePhotosCount: lead.photosCount,
+          hasGoogleBusinessProfile: true,
+          googlePlacesEnrichedAt: new Date(),
+          dataSource: 'google_places',
         })
-        .onConflictDoUpdate({
+        .onConflictDoNothing({
           target: [schema.businesses.registryId, schema.businesses.country],
-          set: {
-            name: candidate.name,
-            legalForm: candidate.legalForm,
-            naceCode: candidate.naceCode,
-            foundedDate: candidate.foundedDate,
-            street: candidate.street,
-            houseNumber: candidate.houseNumber,
-            postalCode: candidate.postalCode,
-            city: candidate.city,
-            province: candidate.province,
-            website: candidate.website,
-            email: candidate.email,
-            phone: candidate.phone,
-            updatedAt: new Date(),
-          },
         })
         .returning({
           id: schema.businesses.id,
-          createdAt: schema.businesses.createdAt,
-          updatedAt: schema.businesses.updatedAt,
         });
 
-      const isNew = Math.abs(result.createdAt.getTime() - result.updatedAt.getTime()) < 1000;
-
-      if (isNew) {
-        imported++;
-        await db.insert(schema.leadStatuses).values({ businessId: result.id, status: 'new' });
-
-        // Compute real score using scoring.ts (audit is null at import time)
-        const scoreResult = computeScore({
-          business: {
-            website: candidate.website,
-            foundedDate: candidate.foundedDate,
-            naceCode: candidate.naceCode,
-            legalForm: candidate.legalForm,
-            email: candidate.email,
-            phone: candidate.phone,
-            googleRating: null,
-            googleReviewCount: null,
-            googleBusinessStatus: null,
-            googlePhotosCount: null,
-            hasGoogleBusinessProfile: null,
-            googlePlacesEnrichedAt: null,
-            recentReviewCount: null,
-            reviewVelocity: null,
-            googlePhotosCountPrev: null,
-            googleBusinessUpdatedAt: null,
-            hasGoogleAds: null,
-            hasSocialMediaLinks: null,
-            optOut: false,
-          },
-          audit: null,
-        });
-
-        await db.insert(schema.leadScores).values({
-          businessId: result.id,
-          totalScore: scoreResult.totalScore,
-          scoreBreakdown: scoreResult.breakdown,
-          maturityCluster: scoreResult.maturityCluster,
-          disqualified: scoreResult.disqualified,
-          dataCompleteness: scoreResult.dataCompleteness,
-          estimatedScore: scoreResult.estimatedScore,
-          disqualifyReason: scoreResult.disqualifyReason,
-        });
-        // Create pipeline entry
-        await db.insert(schema.leadPipeline).values({ businessId: result.id, stage: 'new' });
-      } else {
+      // If onConflictDoNothing returned nothing, it's a duplicate
+      if (!result) {
         duplicates++;
+        continue;
       }
 
-      // Mark candidate as imported
-      await db
-        .update(schema.kboCandidates)
-        .set({ status: 'imported', importedAt: new Date(), updatedAt: new Date() })
-        .where(eq(schema.kboCandidates.id, candidate.id));
+      imported++;
+
+      // Create lead status
+      await db.insert(schema.leadStatuses).values({
+        businessId: result.id,
+        status: 'new',
+      });
+
+      // Compute score with all available Google data
+      const scoreResult = computeScore({
+        business: {
+          website: lead.website,
+          foundedDate: null,
+          naceCode: null,
+          legalForm: null,
+          email: null,
+          phone: lead.phone,
+          googleRating: lead.rating,
+          googleReviewCount: lead.reviewCount,
+          googleBusinessStatus: lead.businessStatus,
+          googlePhotosCount: lead.photosCount,
+          hasGoogleBusinessProfile: true,
+          googlePlacesEnrichedAt: new Date(),
+          recentReviewCount: null,
+          reviewVelocity: null,
+          googlePhotosCountPrev: null,
+          googleBusinessUpdatedAt: null,
+          hasGoogleAds: null,
+          hasSocialMediaLinks: null,
+          optOut: false,
+        },
+        audit: null,
+      });
+
+      // Insert lead score
+      await db.insert(schema.leadScores).values({
+        businessId: result.id,
+        totalScore: scoreResult.totalScore,
+        scoreBreakdown: scoreResult.breakdown,
+        maturityCluster: scoreResult.maturityCluster,
+        disqualified: scoreResult.disqualified,
+        disqualifyReason: scoreResult.disqualifyReason,
+      });
+
+      // Create pipeline entry
+      await db.insert(schema.leadPipeline).values({
+        businessId: result.id,
+        stage: 'new',
+      });
     }
 
     // Update import log
@@ -248,8 +196,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       imported,
       duplicates,
-      total: candidates.length,
-      importLogId: importLog.id,
+      total: toImport.length,
     });
   } catch (error) {
     console.error('Smart import error:', error);

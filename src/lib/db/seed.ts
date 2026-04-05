@@ -733,7 +733,7 @@ async function main() {
         phone: b.phone,
         googleRating: b.googleRating,
         googleReviewCount: b.googleReviewCount,
-        dataSource: 'kbo_bulk' as const,
+        dataSource: 'google_places' as const,
       })),
     )
     .returning();

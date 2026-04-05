@@ -64,10 +64,6 @@ export default async function SettingsPage() {
 
   function getSourceLabel(source: string) {
     switch (source) {
-      case "kbo_bulk":
-        return "KBO Bulk";
-      case "kvk_open":
-        return "KVK Open";
       case "google_places":
         return "Google Places";
       case "manual":
