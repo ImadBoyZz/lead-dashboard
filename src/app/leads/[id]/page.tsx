@@ -30,6 +30,7 @@ import { AddNote } from "./add-note";
 import { DeleteNoteButton } from "@/components/notes/delete-note-button";
 import { CopyButton } from "./copy-button";
 import { ScanButton } from "./scan-button";
+import { DetailLeadActions } from "./detail-lead-actions";
 import type { ScoreBreakdown } from "@/types";
 
 interface PageProps {
@@ -270,6 +271,11 @@ export default async function LeadDetailPage({ params }: PageProps) {
                 </div>
               )}
             </div>
+          </Card>
+
+          {/* Lead Acties */}
+          <Card title="Lead Acties">
+            <DetailLeadActions leadId={id} temperature={business.leadTemperature} />
           </Card>
 
           {/* Notities */}
