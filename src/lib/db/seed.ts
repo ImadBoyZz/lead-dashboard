@@ -733,7 +733,7 @@ async function main() {
         phone: b.phone,
         googleRating: b.googleRating,
         googleReviewCount: b.googleReviewCount,
-        dataSource: 'kbo_bulk' as const,
+        dataSource: 'google_places' as const,
       })),
     )
     .returning();
@@ -792,12 +792,26 @@ async function main() {
         website: biz.website,
         foundedDate: biz.foundedDate,
         naceCode: biz.naceCode,
+        legalForm: biz.legalForm,
+        email: biz.email,
+        phone: biz.phone,
         googleRating: biz.googleRating,
         googleReviewCount: biz.googleReviewCount,
+        googleBusinessStatus: null,
+        googlePhotosCount: null,
+        hasGoogleBusinessProfile: null,
+        googlePlacesEnrichedAt: null,
+        recentReviewCount: null,
+        reviewVelocity: null,
+        googlePhotosCountPrev: null,
+        googleBusinessUpdatedAt: null,
+        hasGoogleAds: null,
+        hasSocialMediaLinks: null,
         optOut: false,
       },
       audit: audit
         ? {
+            websiteHttpStatus: 200,
             pagespeedMobileScore: audit.pagespeedMobile,
             pagespeedDesktopScore: audit.pagespeedDesktop,
             hasSsl: audit.hasSsl,
@@ -812,6 +826,9 @@ async function main() {
             hasMetaDescription: audit.hasMetaDescription,
             hasOpenGraph: audit.hasOpenGraph,
             hasStructuredData: audit.hasStructuredData,
+            auditedAt: null,
+            hasGoogleAdsTag: null,
+            hasSocialMediaLinks: null,
           }
         : null,
     };

@@ -81,15 +81,15 @@ const patchSchema = z.object({
     .enum([
       'new',
       'contacted',
-      'replied',
       'meeting',
       'won',
-      'lost',
-      'disqualified',
+      'ignored',
     ])
     .optional(),
   note: z.string().optional(),
   optOut: z.boolean().optional(),
+  leadTemperature: z.enum(['cold', 'warm']).optional(),
+  blacklisted: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -108,7 +108,7 @@ export async function PATCH(
       );
     }
 
-    const { status, note, optOut } = parsed.data;
+    const { status, note, optOut, leadTemperature, blacklisted } = parsed.data;
 
     // Verify business exists
     const [business] = await db
@@ -139,9 +139,8 @@ export async function PATCH(
       };
 
       if (status === 'contacted') statusUpdate.contactedAt = new Date();
-      if (status === 'replied') statusUpdate.repliedAt = new Date();
       if (status === 'meeting') statusUpdate.meetingAt = new Date();
-      if (status === 'won' || status === 'lost') statusUpdate.closedAt = new Date();
+      if (status === 'won' || status === 'ignored') statusUpdate.closedAt = new Date();
 
       await db
         .update(schema.leadStatuses)
@@ -171,6 +170,26 @@ export async function PATCH(
         .set({
           optOut,
           optOutAt: optOut ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.businesses.id, id));
+    }
+
+    // Handle temperature change (cold → warm)
+    if (leadTemperature) {
+      await db
+        .update(schema.businesses)
+        .set({ leadTemperature, updatedAt: new Date() })
+        .where(eq(schema.businesses.id, id));
+    }
+
+    // Handle blacklist
+    if (blacklisted !== undefined) {
+      await db
+        .update(schema.businesses)
+        .set({
+          blacklisted,
+          blacklistedAt: blacklisted ? new Date() : null,
           updatedAt: new Date(),
         })
         .where(eq(schema.businesses.id, id));

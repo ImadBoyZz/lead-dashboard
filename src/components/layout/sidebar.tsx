@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, KanbanSquare, Settings } from "lucide-react";
+import { Snowflake, Flame, KanbanSquare, Settings, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: "Leads", href: "/leads", icon: Users },
+  { name: "Cold Leads", href: "/leads", icon: Snowflake },
+  { name: "Warm Leads", href: "/warm", icon: Flame },
   { name: "Pipeline", href: "/pipeline", icon: KanbanSquare },
+  { name: "Logs", href: "/logs", icon: FileText },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

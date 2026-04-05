@@ -3,8 +3,6 @@ import {
   eq,
   and,
   ilike,
-  gte,
-  lte,
   isNull,
   isNotNull,
   or,
@@ -20,8 +18,6 @@ export async function GET(request: NextRequest) {
     const country = searchParams.get('country') as 'BE' | 'NL' | null;
     const province = searchParams.get('province');
     const status = searchParams.get('status');
-    const scoreMin = searchParams.get('scoreMin');
-    const scoreMax = searchParams.get('scoreMax');
     const search = searchParams.get('search');
     const naceCode = searchParams.get('naceCode');
     const hasWebsite = searchParams.get('hasWebsite');
@@ -51,12 +47,6 @@ export async function GET(request: NextRequest) {
         ),
       );
     }
-    if (scoreMin) {
-      conditions.push(gte(schema.leadScores.totalScore, parseInt(scoreMin, 10)));
-    }
-    if (scoreMax) {
-      conditions.push(lte(schema.leadScores.totalScore, parseInt(scoreMax, 10)));
-    }
     if (search) {
       conditions.push(
         or(
@@ -79,20 +69,15 @@ export async function GET(request: NextRequest) {
     const data = await db
       .select({
         business: schema.businesses,
-        score: schema.leadScores,
         status: schema.leadStatuses,
       })
       .from(schema.businesses)
-      .leftJoin(
-        schema.leadScores,
-        eq(schema.businesses.id, schema.leadScores.businessId),
-      )
       .leftJoin(
         schema.leadStatuses,
         eq(schema.businesses.id, schema.leadStatuses.businessId),
       )
       .where(whereClause)
-      .orderBy(desc(schema.leadScores.totalScore));
+      .orderBy(desc(schema.businesses.createdAt));
 
     // Build CSV
     const headers = [
@@ -104,7 +89,6 @@ export async function GET(request: NextRequest) {
       'Website',
       'Email',
       'Telefoon',
-      'Score',
       'Status',
       'NACE Code',
       'Opgericht',
@@ -131,7 +115,6 @@ export async function GET(request: NextRequest) {
         escapeCsv(row.business.website),
         escapeCsv(row.business.email),
         escapeCsv(row.business.phone),
-        escapeCsv(row.score?.totalScore),
         escapeCsv(row.status?.status),
         escapeCsv(row.business.naceCode),
         escapeCsv(row.business.foundedDate),

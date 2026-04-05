@@ -1,11 +1,9 @@
 export const LEAD_STATUS_OPTIONS = [
   { value: 'new', label: 'Nieuw', color: 'bg-blue-100 text-blue-700' },
   { value: 'contacted', label: 'Gecontacteerd', color: 'bg-yellow-100 text-yellow-700' },
-  { value: 'replied', label: 'Gereageerd', color: 'bg-purple-100 text-purple-700' },
-  { value: 'meeting', label: 'Meeting', color: 'bg-indigo-100 text-indigo-700' },
+  { value: 'meeting', label: 'Afspraak', color: 'bg-indigo-100 text-indigo-700' },
   { value: 'won', label: 'Gewonnen', color: 'bg-green-100 text-green-700' },
-  { value: 'lost', label: 'Verloren', color: 'bg-red-100 text-red-700' },
-  { value: 'disqualified', label: 'Gediskwalificeerd', color: 'bg-gray-100 text-gray-700' },
+  { value: 'ignored', label: 'Genegeerd', color: 'bg-gray-100 text-gray-700' },
 ] as const;
 
 export const COUNTRY_OPTIONS = [
@@ -38,9 +36,31 @@ export const TARGET_NACE_CODES = {
 export const ITEMS_PER_PAGE = 25;
 
 export const SORT_OPTIONS = [
-  { value: 'score', label: 'Score (hoog → laag)' },
   { value: 'name', label: 'Naam (A → Z)' },
   { value: 'city', label: 'Stad (A → Z)' },
   { value: 'founded', label: 'Oprichtingsdatum' },
   { value: 'recent', label: 'Recent toegevoegd' },
+] as const;
+
+export const PIPELINE_STAGE_OPTIONS = [
+  { value: 'new', label: 'Nieuw', color: 'bg-blue-100 text-blue-700' },
+  { value: 'contacted', label: 'Gecontacteerd', color: 'bg-yellow-100 text-yellow-700' },
+  { value: 'meeting', label: 'Afspraak', color: 'bg-indigo-100 text-indigo-700' },
+  { value: 'won', label: 'Gewonnen', color: 'bg-green-100 text-green-700' },
+  { value: 'ignored', label: 'Genegeerd', color: 'bg-gray-100 text-gray-700' },
+] as const;
+
+export const OUTREACH_CHANNEL_OPTIONS = [
+  { value: 'email', label: 'Email', icon: 'Mail' },
+  { value: 'phone', label: 'Telefoon', icon: 'Phone' },
+  { value: 'linkedin', label: 'LinkedIn', icon: 'Linkedin' },
+  { value: 'whatsapp', label: 'WhatsApp', icon: 'MessageCircle' },
+  { value: 'in_person', label: 'Persoonlijk', icon: 'Users' },
+] as const;
+
+export const PRIORITY_OPTIONS = [
+  { value: 'low', label: 'Laag', color: 'bg-gray-100 text-gray-600' },
+  { value: 'medium', label: 'Medium', color: 'bg-blue-100 text-blue-600' },
+  { value: 'high', label: 'Hoog', color: 'bg-orange-100 text-orange-600' },
+  { value: 'urgent', label: 'Urgent', color: 'bg-red-100 text-red-600' },
 ] as const;

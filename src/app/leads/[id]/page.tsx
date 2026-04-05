@@ -27,6 +27,7 @@ import { getScoreColor, getScoreLabel } from "@/lib/scoring";
 import { LEAD_STATUS_OPTIONS } from "@/lib/constants";
 import { StatusChanger } from "./status-changer";
 import { AddNote } from "./add-note";
+import { DeleteNoteButton } from "@/components/notes/delete-note-button";
 import { CopyButton } from "./copy-button";
 import { ScanButton } from "./scan-button";
 import type { ScoreBreakdown } from "@/types";
@@ -278,9 +279,12 @@ export default async function LeadDetailPage({ params }: PageProps) {
                 <p className="text-sm text-muted">Nog geen notities</p>
               )}
               {leadNotes.map((note) => (
-                <div key={note.id} className="border-l-2 border-accent/30 pl-3 py-1">
-                  <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                  <p className="text-xs text-muted mt-1">{formatDate(note.createdAt)}</p>
+                <div key={note.id} className="border-l-2 border-accent/30 pl-3 py-1 flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                    <p className="text-xs text-muted mt-1">{formatDate(note.createdAt)}</p>
+                  </div>
+                  <DeleteNoteButton noteId={note.id} />
                 </div>
               ))}
               <div className="pt-2 border-t border-card-border">
@@ -288,6 +292,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
               </div>
             </div>
           </Card>
+
         </div>
 
         {/* Right column */}

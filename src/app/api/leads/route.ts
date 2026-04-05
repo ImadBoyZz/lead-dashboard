@@ -191,7 +191,7 @@ const createLeadSchema = z.object({
   googleRating: z.number().optional(),
   googleReviewCount: z.number().optional(),
   dataSource: z
-    .enum(['kbo_bulk', 'kvk_open', 'google_places', 'manual'])
+    .enum(['google_places', 'manual'])
     .default('manual'),
 });
 

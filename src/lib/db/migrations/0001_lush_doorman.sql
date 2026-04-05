@@ -1,0 +1,1 @@
+ALTER TABLE "kbo_candidates" ADD COLUMN "enterprise_status" text DEFAULT 'AC';

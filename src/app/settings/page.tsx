@@ -1,13 +1,13 @@
 export const dynamic = 'force-dynamic';
 
-import { desc, count } from "drizzle-orm";
+import { desc, eq, count } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { Header } from "@/components/layout/header";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
-import { GdprOptOut } from "./gdpr-opt-out";
+import { BlacklistTable } from "./blacklist-table";
 import {
   Database,
   CheckCircle2,
@@ -33,6 +33,20 @@ export default async function SettingsPage() {
     .from(schema.auditResults);
 
   const lastImport = imports.length > 0 ? imports[0] : null;
+
+  // Fetch blacklisted leads
+  const blacklisted = await db
+    .select({
+      id: schema.businesses.id,
+      name: schema.businesses.name,
+      city: schema.businesses.city,
+      sector: schema.businesses.sector,
+      website: schema.businesses.website,
+      blacklistedAt: schema.businesses.blacklistedAt,
+    })
+    .from(schema.businesses)
+    .where(eq(schema.businesses.blacklisted, true))
+    .orderBy(desc(schema.businesses.blacklistedAt));
 
   function getImportStatusBadge(status: string) {
     switch (status) {
@@ -64,10 +78,6 @@ export default async function SettingsPage() {
 
   function getSourceLabel(source: string) {
     switch (source) {
-      case "kbo_bulk":
-        return "KBO Bulk";
-      case "kvk_open":
-        return "KVK Open";
       case "google_places":
         return "Google Places";
       case "manual":
@@ -150,10 +160,11 @@ export default async function SettingsPage() {
           )}
         </Card>
 
-        {/* GDPR */}
-        <Card title="GDPR" description="Beheer opt-out verzoeken van bedrijven">
-          <GdprOptOut />
+        {/* Blacklist */}
+        <Card title="Blacklist" description={blacklisted.length + " geblokkeerde leads — worden nooit meer geïmporteerd"}>
+          <BlacklistTable data={blacklisted} />
         </Card>
+
 
         {/* Systeem Info */}
         <Card title="Systeem Info">
