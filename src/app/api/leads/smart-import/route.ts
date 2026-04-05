@@ -129,6 +129,7 @@ export async function POST(request: NextRequest) {
           registryId: lead.placeId,
           country: 'BE',
           name: lead.name,
+          street: lead.address || null,
           city: city,
           sector: sector,
           website: lead.website,

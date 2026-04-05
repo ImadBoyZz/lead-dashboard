@@ -12,7 +12,6 @@ import {
   ArrowUpRight,
   CheckCircle2,
   XCircle,
-  Building2,
   MapPin,
   Calendar,
 } from "lucide-react";
@@ -153,12 +152,6 @@ export default async function LeadDetailPage({ params }: PageProps) {
                     <p>{business.postalCode ? business.postalCode + " " + (business.city ?? "") : business.city ?? "\u2014"}</p>
                     <p>{business.province ?? ""} {countryFlag}</p>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-muted shrink-0" />
-                  <span className="text-sm">
-                    {business.naceCode ? business.naceCode + " \u2014 " + (business.naceDescription ?? "") : "Geen NACE code"}
-                  </span>
                 </div>
               </div>
               <div className="space-y-3">
