@@ -48,7 +48,7 @@ export function Sidebar() {
         <p className="text-[10px] text-sidebar-foreground/40 uppercase tracking-wider">
           GDPR Compliant
         </p>
-        <p className="text-[10px] text-sidebar-foreground/30 mt-0.5">v0.1.0</p>
+        <p className="text-[10px] text-sidebar-foreground/30 mt-0.5">v0.9 Beta</p>
       </div>
     </aside>
   );
