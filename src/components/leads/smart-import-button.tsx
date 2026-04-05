@@ -22,10 +22,10 @@ interface PreviewLead {
 
 
 const QUERY_OPTIONS = [
-  { value: 1, label: "1 query", maxLeads: 20, cost: "€0.03" },
-  { value: 2, label: "2 queries", maxLeads: 40, cost: "€0.06" },
-  { value: 3, label: "3 queries", maxLeads: 60, cost: "€0.10" },
-  { value: 6, label: "6 queries (alle subsectoren)", maxLeads: 120, cost: "€0.19" },
+  { value: 1, label: "20 leads — €0.03" },
+  { value: 2, label: "40 leads — €0.06" },
+  { value: 3, label: "60 leads — €0.10" },
+  { value: 5, label: "100 leads — €0.16" },
 ];
 
 export function SmartImportButton() {
@@ -197,7 +197,7 @@ export function SmartImportButton() {
           >
             {QUERY_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
-                {opt.label} — max {opt.maxLeads} leads — {opt.cost}
+                {opt.label}
               </option>
             ))}
           </select>

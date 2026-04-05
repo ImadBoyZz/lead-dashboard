@@ -174,7 +174,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
     <div>
       <Header
         title="Cold Leads"
-        description={formatNumber(total) + " leads gevonden"}
+        description=""
         actions={
           <div className="flex items-center gap-2">
             <SmartImportButton />
