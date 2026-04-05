@@ -161,9 +161,7 @@ export default async function SettingsPage() {
         </Card>
 
         {/* Blacklist */}
-        <Card title="Blacklist" description={blacklisted.length + " geblokkeerde leads — worden nooit meer geïmporteerd"}>
-          <BlacklistTable data={blacklisted} />
-        </Card>
+        <BlacklistTable data={blacklisted} />
 
 
         {/* Systeem Info */}

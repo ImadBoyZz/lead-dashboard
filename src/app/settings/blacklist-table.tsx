@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Undo2, Loader2 } from "lucide-react";
+import { Undo2, Loader2, Ban, Search, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface BlacklistEntry {
   id: string;
@@ -22,7 +23,7 @@ function formatDate(date: Date | string | null) {
   });
 }
 
-function UnblacklistButton({ leadId }: { leadId: string }) {
+function UnblacklistButton({ leadId, onDone }: { leadId: string; onDone: () => void }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -35,6 +36,7 @@ function UnblacklistButton({ leadId }: { leadId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ blacklisted: false, leadTemperature: "cold" }),
       });
+      onDone();
       router.refresh();
     } finally {
       setLoading(false);
@@ -59,36 +61,117 @@ function UnblacklistButton({ leadId }: { leadId: string }) {
 }
 
 export function BlacklistTable({ data }: { data: BlacklistEntry[] }) {
-  if (data.length === 0) {
-    return <p className="text-sm text-muted">Geen geblokkeerde leads</p>;
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [entries, setEntries] = useState(data);
+
+  const filtered = entries.filter((e) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      e.name.toLowerCase().includes(q) ||
+      (e.city?.toLowerCase().includes(q) ?? false) ||
+      (e.sector?.toLowerCase().includes(q) ?? false)
+    );
+  });
+
+  function handleRestored(id: string) {
+    setEntries((prev) => prev.filter((e) => e.id !== id));
   }
 
   return (
-    <div className="overflow-x-auto -mx-6 -mb-6">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-gray-50/80 border-b border-card-border">
-            <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted uppercase tracking-wider">Naam</th>
-            <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted uppercase tracking-wider">Sector</th>
-            <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted uppercase tracking-wider">Locatie</th>
-            <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted uppercase tracking-wider">Geblokkeerd op</th>
-            <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted uppercase tracking-wider"></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-card-border">
-          {data.map((entry) => (
-            <tr key={entry.id} className="hover:bg-gray-50/40">
-              <td className="px-4 py-2.5 font-medium">{entry.name}</td>
-              <td className="px-4 py-2.5 text-muted capitalize">{entry.sector ?? "\u2014"}</td>
-              <td className="px-4 py-2.5 text-muted">{entry.city ?? "\u2014"}</td>
-              <td className="px-4 py-2.5 text-muted">{formatDate(entry.blacklistedAt)}</td>
-              <td className="px-4 py-2.5">
-                <UnblacklistButton leadId={entry.id} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => setOpen(true)}
+      >
+        <Ban className="h-4 w-4" />
+        Blacklist ({entries.length})
+      </Button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setOpen(false)}
+          />
+
+          {/* Modal */}
+          <div className="relative w-full max-w-2xl max-h-[80vh] bg-card border border-card-border rounded-xl shadow-2xl flex flex-col mx-4">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-card-border">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Blacklist</h2>
+                <p className="text-xs text-muted mt-0.5">
+                  {entries.length} geblokkeerde leads
+                </p>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                className="rounded-lg p-1.5 text-muted hover:bg-gray-100 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="px-6 py-3 border-b border-card-border">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
+                <input
+                  type="text"
+                  placeholder="Zoek op naam, stad of sector..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto px-6 py-2">
+              {filtered.length === 0 ? (
+                <p className="text-sm text-muted py-8 text-center">
+                  {entries.length === 0
+                    ? "Geen geblokkeerde leads"
+                    : "Geen resultaten gevonden"}
+                </p>
+              ) : (
+                <div className="divide-y divide-card-border">
+                  {filtered.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-center justify-between py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {entry.name}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {entry.sector ? (
+                            <span className="capitalize">{entry.sector}</span>
+                          ) : null}
+                          {entry.sector && entry.city ? " · " : ""}
+                          {entry.city ?? ""}
+                          {(entry.sector || entry.city) && entry.blacklistedAt ? " · " : ""}
+                          {formatDate(entry.blacklistedAt)}
+                        </p>
+                      </div>
+                      <UnblacklistButton
+                        leadId={entry.id}
+                        onDone={() => handleRestored(entry.id)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
