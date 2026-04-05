@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { discoverLeads, buildSearchQuery } from '@/lib/places-discovery';
+import { discoverLeads, buildSearchQuery, buildSearchQueries, detectBatchDuplicates } from '@/lib/places-discovery';
 import { computeScore } from '@/lib/scoring';
 
 // GET — Preview: discover leads from Google Places, deduplicate, return without saving
@@ -19,8 +19,28 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const query = buildSearchQuery(sector, city);
-    const { leads, fromMock } = await discoverLeads(query, 20);
+    const queryCount = Math.min(parseInt(searchParams.get('queries') ?? '1', 10), 6);
+    const queries = buildSearchQueries(sector, city, queryCount);
+
+    // Voer alle queries uit en combineer resultaten
+    let allLeads: Awaited<ReturnType<typeof discoverLeads>>['leads'] = [];
+    let fromMock = false;
+    const seenPlaceIds = new Set<string>();
+
+    for (const query of queries) {
+      const result = await discoverLeads(query, 20);
+      fromMock = fromMock || result.fromMock;
+      for (const lead of result.leads) {
+        if (!seenPlaceIds.has(lead.placeId)) {
+          seenPlaceIds.add(lead.placeId);
+          allLeads.push(lead);
+        }
+      }
+    }
+
+    // Sorteer op kwaliteitsscore
+    allLeads.sort((a, b) => b.qualityScore - a.qualityScore);
+    const leads = allLeads;
 
     // Deduplicate against existing businesses by googlePlaceId
     const placeIds = leads.map((l) => l.placeId);
@@ -41,6 +61,9 @@ export async function GET(request: NextRequest) {
 
     const newLeads = leads.filter((l) => !existingPlaceIds.has(l.placeId));
     const alreadyImported = leads.length - newLeads.length;
+
+    // Batch-level keten-detectie (duplicaat namen)
+    detectBatchDuplicates(newLeads);
 
     return NextResponse.json({
       leads: newLeads,
@@ -107,6 +130,7 @@ export async function POST(request: NextRequest) {
           country: 'BE',
           name: lead.name,
           city: city,
+          sector: sector,
           website: lead.website,
           phone: lead.phone,
           googlePlaceId: lead.placeId,
@@ -116,6 +140,7 @@ export async function POST(request: NextRequest) {
           googlePhotosCount: lead.photosCount,
           hasGoogleBusinessProfile: true,
           googlePlacesEnrichedAt: new Date(),
+          chainWarning: lead.chainWarning,
           dataSource: 'google_places',
         })
         .onConflictDoNothing({

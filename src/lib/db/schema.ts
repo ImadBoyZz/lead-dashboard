@@ -79,6 +79,11 @@ export const businesses = pgTable(
     lastKnownActivityAt: timestamp('last_known_activity_at'),
     websiteHealthy: boolean('website_healthy'),
     websiteLastCheckedAt: timestamp('website_last_checked_at'),
+    sector: text('sector'),  // sector gebruikt bij import (beauty, horeca, bouw, etc.)
+    chainWarning: text('chain_warning'),  // reden waarom dit mogelijk een keten is, null = geen warning
+    leadTemperature: text('lead_temperature').default('cold').notNull(), // 'cold' | 'warm'
+    blacklisted: boolean('blacklisted').default(false).notNull(),
+    blacklistedAt: timestamp('blacklisted_at'),
     dataSource: dataSourceEnum('data_source').notNull(),
     scrapedAt: timestamp('scraped_at').defaultNow().notNull(),
     legalBasis: text('legal_basis').default('legitimate_interest_b2b'),

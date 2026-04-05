@@ -10,9 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Pagination } from "@/components/ui/pagination";
-import { ScoreBadge } from "@/components/leads/score-badge";
 import { SmartImportButton } from "@/components/leads/smart-import-button";
 import { LeadFilters } from "@/components/leads/lead-filters";
+import { LeadActions } from "@/components/leads/lead-actions";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { LEAD_STATUS_OPTIONS, ITEMS_PER_PAGE } from "@/lib/constants";
 
@@ -26,20 +26,22 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   const country = (params.country as string) || undefined;
   const province = (params.province as string) || undefined;
   const status = (params.status as string) || undefined;
-  const scoreMin = (params.scoreMin as string) || undefined;
-  const scoreMax = (params.scoreMax as string) || undefined;
+  const sector = (params.sector as string) || undefined;
   const search = (params.search as string) || undefined;
   const naceCode = (params.naceCode as string) || undefined;
   const hasWebsite = (params.hasWebsite as string) || undefined;
-  const sort = (params.sort as string) || "score";
+  const imported = (params.imported as string) || undefined;
+  const sort = (params.sort as string) || "recent";
   const order = (params.order as string) || (sort === "score" ? "desc" : "asc");
   const page = Math.max(1, parseInt((params.page as string) ?? "1", 10));
   const limit = ITEMS_PER_PAGE;
   const offset = (page - 1) * limit;
 
-  // Build WHERE conditions
+  // Build WHERE conditions — Cold leads only (niet warm, niet blacklisted)
   const conditions = [];
   conditions.push(eq(schema.businesses.optOut, false));
+  conditions.push(eq(schema.businesses.blacklisted, false));
+  conditions.push(eq(schema.businesses.leadTemperature, 'cold'));
 
   if (country) {
     conditions.push(eq(schema.businesses.country, country as "BE" | "NL"));
@@ -55,11 +57,25 @@ export default async function LeadsPage({ searchParams }: PageProps) {
       )
     );
   }
-  if (scoreMin) {
-    conditions.push(gte(schema.leadScores.totalScore, parseInt(scoreMin, 10)));
+  if (sector) {
+    conditions.push(eq(schema.businesses.sector, sector));
   }
-  if (scoreMax) {
-    conditions.push(lte(schema.leadScores.totalScore, parseInt(scoreMax, 10)));
+  if (imported) {
+    const now = new Date();
+    let since: Date;
+    if (imported === "today") {
+      since = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      conditions.push(gte(schema.businesses.createdAt, since));
+    } else if (imported === "week") {
+      since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      conditions.push(gte(schema.businesses.createdAt, since));
+    } else if (imported === "month") {
+      since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      conditions.push(gte(schema.businesses.createdAt, since));
+    } else if (imported === "older") {
+      since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      conditions.push(lte(schema.businesses.createdAt, since));
+    }
   }
   if (search) {
     conditions.push(
@@ -131,12 +147,12 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   if (country) filterParams.country = country;
   if (province) filterParams.province = province;
   if (status) filterParams.status = status;
-  if (scoreMin) filterParams.scoreMin = scoreMin;
-  if (scoreMax) filterParams.scoreMax = scoreMax;
+  if (sector) filterParams.sector = sector;
   if (search) filterParams.search = search;
   if (naceCode) filterParams.naceCode = naceCode;
   if (hasWebsite) filterParams.hasWebsite = hasWebsite;
-  if (sort && sort !== "score") filterParams.sort = sort;
+  if (imported) filterParams.imported = imported;
+  if (sort && sort !== "recent") filterParams.sort = sort;
   if (order && order !== "desc") filterParams.order = order;
 
   function getStatusOption(value: string | undefined) {
@@ -157,7 +173,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   return (
     <div>
       <Header
-        title="Leads"
+        title="Cold Leads"
         description={formatNumber(total) + " leads gevonden"}
         actions={
           <div className="flex items-center gap-2">
@@ -177,11 +193,11 @@ export default async function LeadsPage({ searchParams }: PageProps) {
           country,
           province,
           status,
-          scoreMin,
-          scoreMax,
+          sector,
           search,
           naceCode,
           hasWebsite,
+          imported,
           sort,
           order,
         }}
@@ -192,13 +208,12 @@ export default async function LeadsPage({ searchParams }: PageProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50/80 border-b border-card-border">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Score</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Naam</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Sector</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Locatie</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Website</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">PageSpeed</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Opgericht</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Acties</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-card-border">
@@ -217,15 +232,22 @@ export default async function LeadsPage({ searchParams }: PageProps) {
                       className={"transition-colors hover:bg-blue-50/40" + (i % 2 === 1 ? " bg-gray-50/40" : "")}
                     >
                       <td className="px-4 py-3">
-                        <ScoreBadge score={row.score?.totalScore ?? null} />
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={"/leads/" + row.business.id}
+                            className="font-medium text-foreground hover:text-accent transition-colors"
+                          >
+                            {row.business.name}
+                          </Link>
+                          {row.business.chainWarning && (
+                            <span className="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-medium text-orange-700" title={row.business.chainWarning}>
+                              Mogelijk keten
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <Link
-                          href={"/leads/" + row.business.id}
-                          className="font-medium text-foreground hover:text-accent transition-colors"
-                        >
-                          {row.business.name}
-                        </Link>
+                      <td className="px-4 py-3 text-muted capitalize">
+                        {row.business.sector ?? "\u2014"}
                       </td>
                       <td className="px-4 py-3 text-muted">
                         {row.business.city && row.business.province
@@ -251,13 +273,6 @@ export default async function LeadsPage({ searchParams }: PageProps) {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={"font-medium " + getPagespeedColor(row.audit?.pagespeedMobileScore ?? null)}>
-                          {row.audit?.pagespeedMobileScore != null
-                            ? row.audit.pagespeedMobileScore
-                            : "\u2014"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
                         {statusOpt ? (
                           <span className={"inline-flex items-center rounded-full text-xs font-medium px-2.5 py-0.5 " + statusOpt.color}>
                             {statusOpt.label}
@@ -266,8 +281,8 @@ export default async function LeadsPage({ searchParams }: PageProps) {
                           <Badge>Nieuw</Badge>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-muted">
-                        {formatDate(row.business.foundedDate)}
+                      <td className="px-4 py-3">
+                        <LeadActions leadId={row.business.id} temperature={row.business.leadTemperature} />
                       </td>
                     </tr>
                   );

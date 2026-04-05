@@ -12,20 +12,17 @@ export default async function PipelinePage() {
     .select({
       pipeline: schema.leadPipeline,
       business: schema.businesses,
-      score: schema.leadScores,
     })
     .from(schema.leadPipeline)
     .innerJoin(schema.businesses, eq(schema.leadPipeline.businessId, schema.businesses.id))
-    .leftJoin(schema.leadScores, eq(schema.businesses.id, schema.leadScores.businessId))
     .where(eq(schema.businesses.optOut, false))
-    .orderBy(desc(schema.leadScores.totalScore));
+    .orderBy(desc(schema.businesses.createdAt));
 
   const cards: PipelineCardData[] = data.map((row) => ({
     pipelineId: row.pipeline.id,
     businessId: row.business.id,
     name: row.business.name,
     city: row.business.city,
-    score: row.score?.totalScore ?? null,
     stage: row.pipeline.stage,
     priority: row.pipeline.priority,
     stageChangedAt: row.pipeline.stageChangedAt,

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Loader2, Download, MapPin, Star, Globe, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ALL_SECTORS } from "@/lib/places-discovery";
 
 interface PreviewLead {
   placeId: string;
@@ -16,27 +17,22 @@ interface PreviewLead {
   googleMapsUri: string | null;
   hasWebsite: boolean;
   qualityScore: number;
+  chainWarning: string | null;
 }
 
-const SECTOR_OPTIONS = [
-  { value: "beauty", label: "Beauty & Wellness" },
-  { value: "horeca", label: "Horeca" },
-  { value: "bouw", label: "Bouw & Ambacht" },
-  { value: "auto", label: "Auto" },
-  { value: "medisch", label: "Medisch" },
-  { value: "vastgoed", label: "Vastgoed" },
-  { value: "retail", label: "Retail" },
-  { value: "fitness", label: "Fitness" },
-  { value: "events", label: "Events" },
-  { value: "huisdieren", label: "Huisdieren" },
-  { value: "transport", label: "Transport" },
-  { value: "onderwijs", label: "Onderwijs" },
+
+const QUERY_OPTIONS = [
+  { value: 1, label: "1 query", maxLeads: 20, cost: "€0.03" },
+  { value: 2, label: "2 queries", maxLeads: 40, cost: "€0.06" },
+  { value: 3, label: "3 queries", maxLeads: 60, cost: "€0.10" },
+  { value: 6, label: "6 queries (alle subsectoren)", maxLeads: 120, cost: "€0.19" },
 ];
 
 export function SmartImportButton() {
   const router = useRouter();
   const [sector, setSector] = useState("");
   const [city, setCity] = useState("");
+  const [queryCount, setQueryCount] = useState(1);
   const [searching, setSearching] = useState(false);
   const [importing, setImporting] = useState(false);
   const [preview, setPreview] = useState<PreviewLead[] | null>(null);
@@ -45,7 +41,7 @@ export function SmartImportButton() {
   const [alreadyImported, setAlreadyImported] = useState(0);
 
   async function handleSearch() {
-    if (!sector || !city.trim()) return;
+    if (!sector || !city) return;
     setSearching(true);
     setPreview(null);
     setResult(null);
@@ -53,12 +49,11 @@ export function SmartImportButton() {
 
     try {
       const res = await fetch(
-        `/api/leads/smart-import?sector=${encodeURIComponent(sector)}&city=${encodeURIComponent(city.trim())}`
+        `/api/leads/smart-import?sector=${encodeURIComponent(sector)}&city=${encodeURIComponent(city)}&queries=${queryCount}`
       );
       const data = await res.json();
       setPreview(data.leads ?? []);
       setAlreadyImported(data.alreadyImported ?? 0);
-      // Select all by default
       setSelected(new Set((data.leads ?? []).map((l: PreviewLead) => l.placeId)));
     } catch {
       setPreview([]);
@@ -124,7 +119,7 @@ export function SmartImportButton() {
             className="rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="">Kies sector...</option>
-            {SECTOR_OPTIONS.map((s) => (
+            {ALL_SECTORS.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
               </option>
@@ -133,22 +128,86 @@ export function SmartImportButton() {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-muted">Stad</label>
-          <input
-            type="text"
+          <label className="text-xs font-medium text-muted">Stad / Regio</label>
+          <select
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            placeholder="bv. Aalst, Gent, Antwerpen"
             className="rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          />
+          >
+            <option value="">Kies stad...</option>
+            <optgroup label="Oost-Vlaanderen">
+              <option value="Gent">Gent & omgeving</option>
+              <option value="Aalst">Aalst & omgeving</option>
+              <option value="Sint-Niklaas">Sint-Niklaas & omgeving</option>
+              <option value="Dendermonde">Dendermonde & omgeving</option>
+              <option value="Oudenaarde">Oudenaarde & omgeving</option>
+              <option value="Wetteren">Wetteren & omgeving</option>
+              <option value="Lokeren">Lokeren & omgeving</option>
+              <option value="Eeklo">Eeklo & omgeving</option>
+              <option value="Geraardsbergen">Geraardsbergen & omgeving</option>
+              <option value="Zele">Zele & omgeving</option>
+            </optgroup>
+            <optgroup label="Antwerpen">
+              <option value="Antwerpen">Antwerpen & omgeving</option>
+              <option value="Mechelen">Mechelen & omgeving</option>
+              <option value="Turnhout">Turnhout & omgeving</option>
+              <option value="Lier">Lier & omgeving</option>
+              <option value="Herentals">Herentals & omgeving</option>
+              <option value="Mol">Mol & omgeving</option>
+              <option value="Boom">Boom & omgeving</option>
+              <option value="Brasschaat">Brasschaat & omgeving</option>
+            </optgroup>
+            <optgroup label="Vlaams-Brabant">
+              <option value="Leuven">Leuven & omgeving</option>
+              <option value="Vilvoorde">Vilvoorde & omgeving</option>
+              <option value="Halle">Halle & omgeving</option>
+              <option value="Aarschot">Aarschot & omgeving</option>
+              <option value="Tienen">Tienen & omgeving</option>
+              <option value="Diest">Diest & omgeving</option>
+            </optgroup>
+            <optgroup label="West-Vlaanderen">
+              <option value="Brugge">Brugge & omgeving</option>
+              <option value="Kortrijk">Kortrijk & omgeving</option>
+              <option value="Oostende">Oostende & omgeving</option>
+              <option value="Roeselare">Roeselare & omgeving</option>
+              <option value="Ieper">Ieper & omgeving</option>
+              <option value="Waregem">Waregem & omgeving</option>
+              <option value="Knokke-Heist">Knokke-Heist & omgeving</option>
+            </optgroup>
+            <optgroup label="Limburg">
+              <option value="Hasselt">Hasselt & omgeving</option>
+              <option value="Genk">Genk & omgeving</option>
+              <option value="Sint-Truiden">Sint-Truiden & omgeving</option>
+              <option value="Tongeren">Tongeren & omgeving</option>
+              <option value="Beringen">Beringen & omgeving</option>
+              <option value="Lommel">Lommel & omgeving</option>
+            </optgroup>
+            <optgroup label="Brussel">
+              <option value="Brussel">Brussel & omgeving</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted">Aantal queries</label>
+          <select
+            value={queryCount}
+            onChange={(e) => setQueryCount(Number(e.target.value))}
+            className="rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          >
+            {QUERY_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label} — max {opt.maxLeads} leads — {opt.cost}
+              </option>
+            ))}
+          </select>
         </div>
 
         <Button
           variant="primary"
           size="sm"
           onClick={handleSearch}
-          disabled={searching || !sector || !city.trim()}
+          disabled={searching || !sector || !city}
         >
           {searching ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -228,6 +287,11 @@ export function SmartImportButton() {
                       <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
                         {lead.qualityScore}pt
                       </span>
+                      {lead.chainWarning && (
+                        <span className="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
+                          ⚠ {lead.chainWarning}
+                        </span>
+                      )}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
                       <span className="flex items-center gap-1">

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { ScoreBadge } from "@/components/leads/score-badge";
 import { PRIORITY_OPTIONS } from "@/lib/constants";
 
 export interface PipelineCardData {
@@ -11,7 +10,6 @@ export interface PipelineCardData {
   businessId: string;
   name: string;
   city: string | null;
-  score: number | null;
   stage: string;
   priority: string;
   stageChangedAt: Date | string;
@@ -60,7 +58,6 @@ export function PipelineCard({ card, isOverlay }: PipelineCardProps) {
       </Link>
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-1.5">
-          <ScoreBadge score={card.score} />
           {priorityConfig && card.priority !== "medium" && (
             <span
               className={
