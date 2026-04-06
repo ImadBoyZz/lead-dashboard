@@ -26,6 +26,7 @@ import { getScoreColor, getScoreLabel } from "@/lib/scoring";
 import { LEAD_STATUS_OPTIONS } from "@/lib/constants";
 import { StatusChanger } from "./status-changer";
 import { MeetingEditor } from "./meeting-editor";
+import { ContactEditor } from "./contact-editor";
 import { AddNote } from "./add-note";
 import { DeleteNoteButton } from "@/components/notes/delete-note-button";
 import { CopyButton } from "./copy-button";
@@ -181,51 +182,13 @@ export default async function LeadDetailPage({ params }: PageProps) {
 
           {/* Contact */}
           <Card title="Contact">
-            {!business.website && !business.email && !business.phone ? (
-              <p className="text-sm text-muted">Geen contactgegevens gevonden</p>
-            ) : (
-              <div className="space-y-3">
-                {business.website && (
-                  <div className="flex items-center justify-between">
-                    <a
-                      href={business.website.startsWith("http") ? business.website : "https://" + business.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm text-accent hover:underline"
-                    >
-                      <Globe className="h-4 w-4" />
-                      {business.website}
-                      <ArrowUpRight className="h-3 w-3" />
-                    </a>
-                    <CopyButton text={business.website} />
-                  </div>
-                )}
-                {business.email && (
-                  <div className="flex items-center justify-between">
-                    <a
-                      href={"mailto:" + business.email}
-                      className="inline-flex items-center gap-2 text-sm text-accent hover:underline"
-                    >
-                      <Mail className="h-4 w-4" />
-                      {business.email}
-                    </a>
-                    <CopyButton text={business.email} />
-                  </div>
-                )}
-                {business.phone && (
-                  <div className="flex items-center justify-between">
-                    <a
-                      href={"tel:" + business.phone}
-                      className="inline-flex items-center gap-2 text-sm text-accent hover:underline"
-                    >
-                      <Phone className="h-4 w-4" />
-                      {business.phone}
-                    </a>
-                    <CopyButton text={business.phone} />
-                  </div>
-                )}
-              </div>
-            )}
+            <ContactEditor
+              leadId={id}
+              email={business.email}
+              phone={business.phone}
+              website={business.website}
+              facebook={business.facebook}
+            />
           </Card>
 
           {/* Status & Pipeline */}
