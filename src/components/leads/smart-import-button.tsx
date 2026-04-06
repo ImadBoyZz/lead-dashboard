@@ -21,18 +21,18 @@ interface PreviewLead {
 }
 
 
-const QUERY_OPTIONS = [
-  { value: 1, label: "20 leads — €0.03" },
-  { value: 2, label: "40 leads — €0.06" },
-  { value: 3, label: "60 leads — €0.10" },
-  { value: 5, label: "100 leads — €0.16" },
+const TARGET_OPTIONS = [
+  { value: 20, label: "~20 leads" },
+  { value: 40, label: "~40 leads" },
+  { value: 60, label: "~60 leads" },
+  { value: 100, label: "~100 leads" },
 ];
 
 export function SmartImportButton() {
   const router = useRouter();
   const [sector, setSector] = useState("");
   const [city, setCity] = useState("");
-  const [queryCount, setQueryCount] = useState(1);
+  const [target, setTarget] = useState(20);
   const [searching, setSearching] = useState(false);
   const [importing, setImporting] = useState(false);
   const [preview, setPreview] = useState<PreviewLead[] | null>(null);
@@ -49,7 +49,7 @@ export function SmartImportButton() {
 
     try {
       const res = await fetch(
-        `/api/leads/smart-import?sector=${encodeURIComponent(sector)}&city=${encodeURIComponent(city)}&queries=${queryCount}`
+        `/api/leads/smart-import?sector=${encodeURIComponent(sector)}&city=${encodeURIComponent(city)}&target=${target}`
       );
       const data = await res.json();
       setPreview(data.leads ?? []);
@@ -189,13 +189,13 @@ export function SmartImportButton() {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-muted">Aantal queries</label>
+          <label className="text-xs font-medium text-muted">Aantal leads</label>
           <select
-            value={queryCount}
-            onChange={(e) => setQueryCount(Number(e.target.value))}
+            value={target}
+            onChange={(e) => setTarget(Number(e.target.value))}
             className="rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           >
-            {QUERY_OPTIONS.map((opt) => (
+            {TARGET_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>

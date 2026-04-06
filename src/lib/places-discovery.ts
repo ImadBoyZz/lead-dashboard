@@ -79,6 +79,61 @@ export const ALL_SECTORS = Object.keys(SECTOR_CATEGORIES)
   }))
   .sort((a, b) => a.label.localeCompare(b.label));
 
+// ── Stad coördinaten voor locationBias ──────────────
+
+interface CityGeoData {
+  lat: number;
+  lng: number;
+  radius: number; // meters
+}
+
+export const CITY_COORDINATES: Record<string, CityGeoData> = {
+  // Oost-Vlaanderen
+  'Gent':             { lat: 51.0543, lng: 3.7174,  radius: 15000 },
+  'Aalst':            { lat: 50.9375, lng: 4.0400,  radius: 15000 },
+  'Sint-Niklaas':     { lat: 51.1565, lng: 4.1440,  radius: 15000 },
+  'Dendermonde':      { lat: 51.0280, lng: 4.1014,  radius: 12000 },
+  'Oudenaarde':       { lat: 50.8459, lng: 3.6048,  radius: 12000 },
+  'Wetteren':         { lat: 51.0042, lng: 3.8818,  radius: 10000 },
+  'Lokeren':          { lat: 51.1034, lng: 3.9901,  radius: 12000 },
+  'Eeklo':            { lat: 51.1870, lng: 3.5571,  radius: 12000 },
+  'Geraardsbergen':   { lat: 50.7729, lng: 3.8778,  radius: 12000 },
+  'Zele':             { lat: 51.0672, lng: 4.0400,  radius: 10000 },
+  // Antwerpen
+  'Antwerpen':        { lat: 51.2194, lng: 4.4025,  radius: 18000 },
+  'Mechelen':         { lat: 51.0259, lng: 4.4776,  radius: 15000 },
+  'Turnhout':         { lat: 51.3227, lng: 4.9483,  radius: 15000 },
+  'Lier':             { lat: 51.1309, lng: 4.5700,  radius: 12000 },
+  'Herentals':        { lat: 51.1764, lng: 4.8335,  radius: 12000 },
+  'Mol':              { lat: 51.1895, lng: 5.1182,  radius: 12000 },
+  'Boom':             { lat: 51.0891, lng: 4.3691,  radius: 10000 },
+  'Brasschaat':       { lat: 51.2928, lng: 4.4924,  radius: 10000 },
+  // Vlaams-Brabant
+  'Leuven':           { lat: 50.8798, lng: 4.7005,  radius: 15000 },
+  'Vilvoorde':        { lat: 50.9281, lng: 4.4280,  radius: 12000 },
+  'Halle':            { lat: 50.7335, lng: 4.2349,  radius: 12000 },
+  'Aarschot':         { lat: 50.9867, lng: 4.8303,  radius: 12000 },
+  'Tienen':           { lat: 50.8076, lng: 4.9375,  radius: 12000 },
+  'Diest':            { lat: 50.9894, lng: 5.0506,  radius: 12000 },
+  // West-Vlaanderen
+  'Brugge':           { lat: 51.2093, lng: 3.2247,  radius: 15000 },
+  'Kortrijk':         { lat: 50.8273, lng: 3.2646,  radius: 15000 },
+  'Oostende':         { lat: 51.2154, lng: 2.9286,  radius: 12000 },
+  'Roeselare':        { lat: 50.9464, lng: 3.1246,  radius: 12000 },
+  'Ieper':            { lat: 50.8517, lng: 2.8860,  radius: 12000 },
+  'Waregem':          { lat: 50.8768, lng: 3.4275,  radius: 12000 },
+  'Knokke-Heist':     { lat: 51.3502, lng: 3.2867,  radius: 10000 },
+  // Limburg
+  'Hasselt':          { lat: 50.9307, lng: 5.3375,  radius: 15000 },
+  'Genk':             { lat: 50.9654, lng: 5.5024,  radius: 15000 },
+  'Sint-Truiden':     { lat: 50.8161, lng: 5.1870,  radius: 12000 },
+  'Tongeren':         { lat: 50.7807, lng: 5.4646,  radius: 12000 },
+  'Beringen':         { lat: 51.0496, lng: 5.2262,  radius: 12000 },
+  'Lommel':           { lat: 51.2316, lng: 5.3134,  radius: 12000 },
+  // Brussel
+  'Brussel':          { lat: 50.8503, lng: 4.3517,  radius: 15000 },
+};
+
 // ── Interfaces ───────────────────────────────────────
 
 interface PlacesApiPlace {
@@ -96,6 +151,7 @@ interface PlacesApiPlace {
 
 interface PlacesApiResponse {
   places?: PlacesApiPlace[];
+  nextPageToken?: string;
 }
 
 export interface DiscoveredLead {
@@ -305,7 +361,7 @@ const FIELD_MASK = [
 export function buildSearchQuery(sector: string, city: string): string {
   const subsectors = SECTOR_CATEGORIES[sector];
   const term = subsectors?.[0] ?? sector;
-  return `${term} nabij ${city}`;
+  return `${term} in ${city}`;
 }
 
 // Genereer meerdere queries voor bredere dekking (1 per subsector)
@@ -313,8 +369,8 @@ export function buildSearchQueries(sector: string, city: string, count: number):
   const subsectors = SECTOR_CATEGORIES[sector] ?? [sector];
   const queries = subsectors
     .slice(0, count)
-    .map((term) => `${term} nabij ${city}`);
-  return queries.length > 0 ? queries : [`${sector} nabij ${city}`];
+    .map((term) => `${term} in ${city}`);
+  return queries.length > 0 ? queries : [`${sector} in ${city}`];
 }
 
 function calculateQualityScore(place: PlacesApiPlace): number {
@@ -349,6 +405,7 @@ function calculateQualityScore(place: PlacesApiPlace): number {
 export async function discoverLeads(
   query: string,
   maxResults: number = 20,
+  city?: string,
 ): Promise<{ leads: DiscoveredLead[]; fromMock: boolean }> {
   // Mock mode voor development
   if (process.env.GOOGLE_PLACES_MOCK === 'true') {
@@ -364,42 +421,71 @@ export async function discoverLeads(
 
   // Budget circuit breaker
   const maxCalls = parseInt(process.env.PLACES_API_MAX_CALLS ?? '250', 10);
-  const callCount = globalCallCount++;
-  if (callCount >= maxCalls) {
+  if (globalCallCount >= maxCalls) {
     console.error(`[Places Discovery] Budget limit reached (${maxCalls} calls). Set PLACES_API_MAX_CALLS to increase.`);
     return { leads: [], fromMock: false };
   }
 
+  // LocationBias opbouwen als we coördinaten hebben
+  const geo = city ? CITY_COORDINATES[city] : undefined;
+  const locationBias = geo
+    ? { circle: { center: { latitude: geo.lat, longitude: geo.lng }, radius: geo.radius } }
+    : undefined;
+
+  const allPlaces: PlacesApiPlace[] = [];
+  let pageToken: string | undefined;
+  const maxPages = Math.ceil(maxResults / 20); // max pagina's nodig om target te halen
+
   try {
-    console.log(`[Places Discovery] Searching: "${query}" (call #${callCount + 1})`);
+    for (let page = 0; page < maxPages; page++) {
+      if (globalCallCount >= maxCalls) {
+        console.warn(`[Places Discovery] Budget limit reached mid-pagination`);
+        break;
+      }
+      globalCallCount++;
 
-    const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': FIELD_MASK,
-      },
-      body: JSON.stringify({
+      console.log(`[Places Discovery] Searching: "${query}" page ${page + 1} (call #${globalCallCount})`);
+
+      const requestBody: Record<string, unknown> = {
         textQuery: query,
-        maxResultCount: Math.min(maxResults, 20), // API limit is 20
-      }),
-    });
+        maxResultCount: 20,
+      };
+      if (locationBias) requestBody.locationBias = locationBias;
+      if (pageToken) requestBody.pageToken = pageToken;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[Places Discovery] API error ${response.status}:`, errorText);
-      return { leads: [], fromMock: false };
+      const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': FIELD_MASK,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[Places Discovery] API error ${response.status}:`, errorText);
+        break;
+      }
+
+      const data: PlacesApiResponse = await response.json();
+
+      if (data.places) {
+        allPlaces.push(...data.places);
+      }
+
+      // Stop als er geen volgende pagina is of we genoeg hebben
+      if (!data.nextPageToken || allPlaces.length >= maxResults) break;
+      pageToken = data.nextPageToken;
     }
 
-    const data: PlacesApiResponse = await response.json();
-
-    if (!data.places || data.places.length === 0) {
+    if (allPlaces.length === 0) {
       console.log('[Places Discovery] No results found');
       return { leads: [], fromMock: false };
     }
 
-    const leads: DiscoveredLead[] = data.places
+    const leads: DiscoveredLead[] = allPlaces
       // Kwaliteitsfilter: skip gesloten bedrijven en 0 reviews
       .filter((place) => {
         if (place.businessStatus === 'CLOSED_PERMANENTLY' || place.businessStatus === 'CLOSED_TEMPORARILY') {
@@ -432,7 +518,7 @@ export async function discoverLeads(
       // Sorteer op kwaliteitsscore (hoogste eerst)
       .sort((a, b) => b.qualityScore - a.qualityScore);
 
-    console.log(`[Places Discovery] Found ${leads.length} qualified leads from ${data.places.length} results`);
+    console.log(`[Places Discovery] Found ${leads.length} qualified leads from ${allPlaces.length} results`);
     return { leads, fromMock: false };
   } catch (error) {
     console.error('[Places Discovery] Request failed:', error);

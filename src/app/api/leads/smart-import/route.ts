@@ -25,16 +25,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const queryCount = Math.min(parseInt(searchParams.get('queries') ?? '1', 10), 6);
-    const queries = buildSearchQueries(sector, city, queryCount);
+    const target = Math.min(parseInt(searchParams.get('target') ?? '20', 10), 200);
+    // Gebruik alle subsectors van de sector voor maximale dekking
+    const subsectors = buildSearchQueries(sector, city, 99);
 
-    // Voer alle queries uit en combineer resultaten
+    // Fetch tot we het target bereiken of alles op is
     let allLeads: Awaited<ReturnType<typeof discoverLeads>>['leads'] = [];
     let fromMock = false;
     const seenPlaceIds = new Set<string>();
 
-    for (const query of queries) {
-      const result = await discoverLeads(query, 20);
+    for (const query of subsectors) {
+      if (allLeads.length >= target) break;
+
+      const remaining = target - allLeads.length;
+      const result = await discoverLeads(query, remaining, city);
       fromMock = fromMock || result.fromMock;
       for (const lead of result.leads) {
         if (!seenPlaceIds.has(lead.placeId)) {
@@ -102,7 +106,7 @@ export async function POST(request: NextRequest) {
     }
 
     const query = buildSearchQuery(sector, city);
-    const { leads } = await discoverLeads(query, 20);
+    const { leads } = await discoverLeads(query, count, city);
 
     // Filter by selectedPlaceIds if provided, otherwise take all up to count
     let toImport = selectedPlaceIds
