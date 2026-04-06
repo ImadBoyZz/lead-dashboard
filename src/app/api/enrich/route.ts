@@ -4,8 +4,14 @@ import * as schema from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { computeScore } from '@/lib/scoring';
 import { lookupGooglePlaces } from '@/lib/google-places';
+import { rateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
+  const { allowed } = rateLimit('enrich', 30, 60 * 1000); // 30 per minuut
+  if (!allowed) {
+    return NextResponse.json({ error: 'Te veel verzoeken. Probeer over een minuut opnieuw.' }, { status: 429 });
+  }
+
   const { businessId } = await request.json();
 
   // 1. Get the business from DB

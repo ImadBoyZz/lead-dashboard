@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { updatePipelineStage } from '@/lib/pipeline-logic';
+
+const pipelineUpdateSchema = z.object({
+  stage: z.enum(['new', 'contacted', 'meeting', 'won', 'ignored']).optional(),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+  dealValue: z.number().min(0).optional(),
+  estimatedCloseDate: z.string().optional(),
+  nextFollowUpAt: z.string().optional(),
+  followUpNote: z.string().max(1000).optional(),
+  lostReason: z.string().max(500).optional(),
+});
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -12,9 +23,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
   try {
     const body = await request.json();
+    const parsed = pipelineUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    }
 
     // If stage is changing, use pipeline logic for sync
-    if (body.stage) {
+    if (parsed.data.stage) {
       const [current] = await db
         .select()
         .from(schema.leadPipeline)
@@ -22,18 +37,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         .limit(1);
 
       if (current) {
-        await updatePipelineStage(current.businessId, body.stage, current.stage);
+        await updatePipelineStage(current.businessId, parsed.data.stage, current.stage);
       }
     }
 
     // Update other fields
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
-    if (body.priority) updateData.priority = body.priority;
-    if (body.dealValue !== undefined) updateData.dealValue = body.dealValue;
-    if (body.estimatedCloseDate !== undefined) updateData.estimatedCloseDate = body.estimatedCloseDate;
-    if (body.nextFollowUpAt !== undefined) updateData.nextFollowUpAt = body.nextFollowUpAt;
-    if (body.followUpNote !== undefined) updateData.followUpNote = body.followUpNote;
-    if (body.lostReason !== undefined) updateData.lostReason = body.lostReason;
+    if (parsed.data.priority) updateData.priority = parsed.data.priority;
+    if (parsed.data.dealValue !== undefined) updateData.dealValue = parsed.data.dealValue;
+    if (parsed.data.estimatedCloseDate !== undefined) updateData.estimatedCloseDate = parsed.data.estimatedCloseDate;
+    if (parsed.data.nextFollowUpAt !== undefined) updateData.nextFollowUpAt = parsed.data.nextFollowUpAt;
+    if (parsed.data.followUpNote !== undefined) updateData.followUpNote = parsed.data.followUpNote;
+    if (parsed.data.lostReason !== undefined) updateData.lostReason = parsed.data.lostReason;
 
     const [updated] = await db
       .update(schema.leadPipeline)

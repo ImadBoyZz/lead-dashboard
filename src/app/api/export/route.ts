@@ -10,9 +10,15 @@ import {
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
+import { rateLimit } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
   try {
+    const { allowed } = rateLimit('export', 5, 60 * 1000); // 5 per minuut
+    if (!allowed) {
+      return NextResponse.json({ error: 'Te veel exports. Probeer over een minuut opnieuw.' }, { status: 429 });
+    }
+
     const { searchParams } = new URL(request.url);
 
     const country = searchParams.get('country') as 'BE' | 'NL' | null;

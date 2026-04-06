@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
+
+const reminderSchema = z.object({
+  businessId: z.string().uuid(),
+  type: z.enum(['follow_up', 'call', 'meeting_prep', 'check_in', 'custom']),
+  title: z.string().min(1).max(200),
+  description: z.string().max(1000).optional(),
+  dueDate: z.string().datetime(),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,14 +37,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const parsed = reminderSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    }
     const [reminder] = await db
       .insert(schema.reminders)
       .values({
-        businessId: body.businessId,
-        type: body.type,
-        title: body.title,
-        description: body.description,
-        dueDate: new Date(body.dueDate),
+        businessId: parsed.data.businessId,
+        type: parsed.data.type,
+        title: parsed.data.title,
+        description: parsed.data.description,
+        dueDate: new Date(parsed.data.dueDate),
       })
       .returning();
     return NextResponse.json(reminder, { status: 201 });

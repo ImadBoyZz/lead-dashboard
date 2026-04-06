@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { and, eq, notInArray, desc } from 'drizzle-orm';
@@ -9,6 +10,14 @@ import {
   markAsIgnored,
   markAsWon,
 } from '@/lib/pipeline-logic';
+
+const queueActionSchema = z.object({
+  action: z.enum(['freeze', 'unfreeze', 'markIgnored', 'markWon']),
+  businessId: z.string().uuid(),
+  rejectionReason: z.enum(['no_budget', 'no_interest', 'has_supplier', 'bad_timing', 'no_response', 'other']).optional(),
+  lostReason: z.string().max(500).optional(),
+  wonValue: z.number().min(0).optional(),
+});
 
 const CLOSED_STAGES = ['won', 'ignored'] as const;
 
@@ -61,11 +70,11 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { action, businessId } = body;
-
-  if (!businessId || !action) {
-    return NextResponse.json({ error: 'businessId and action required' }, { status: 400 });
+  const parsed = queueActionSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
   }
+  const { action, businessId } = parsed.data;
 
   switch (action) {
     case 'freeze':
@@ -84,11 +93,11 @@ export async function POST(request: NextRequest) {
     }
 
     case 'markIgnored':
-      await markAsIgnored(businessId, body.rejectionReason ?? 'other', body.lostReason);
+      await markAsIgnored(businessId, parsed.data.rejectionReason ?? 'other', parsed.data.lostReason);
       return NextResponse.json({ success: true, action: 'ignored' });
 
     case 'markWon':
-      await markAsWon(businessId, body.wonValue ?? 0);
+      await markAsWon(businessId, parsed.data.wonValue ?? 0);
       return NextResponse.json({ success: true, action: 'won' });
 
     default:

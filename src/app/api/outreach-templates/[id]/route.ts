@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
+
+const templateUpdateSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  channel: z.enum(['email', 'phone', 'linkedin', 'whatsapp', 'in_person']).optional(),
+  subject: z.string().max(500).optional(),
+  body: z.string().min(1).max(5000).optional(),
+  variables: z.array(z.string()).optional(),
+  isDefault: z.boolean().optional(),
+});
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -29,15 +39,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
   try {
     const body = await request.json();
+    const parsed = templateUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    }
     const [updated] = await db
       .update(schema.outreachTemplates)
       .set({
-        name: body.name,
-        channel: body.channel,
-        subject: body.subject,
-        body: body.body,
-        variables: body.variables,
-        isDefault: body.isDefault,
+        ...parsed.data,
         updatedAt: new Date(),
       })
       .where(eq(schema.outreachTemplates.id, id))

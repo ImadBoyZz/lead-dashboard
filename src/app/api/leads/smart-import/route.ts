@@ -4,10 +4,16 @@ import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { discoverLeads, buildSearchQuery, buildSearchQueries, detectBatchDuplicates } from '@/lib/places-discovery';
 import { computeScore } from '@/lib/scoring';
+import { rateLimit } from '@/lib/rate-limit';
 
 // GET — Preview: discover leads from Google Places, deduplicate, return without saving
 export async function GET(request: NextRequest) {
   try {
+    const { allowed } = rateLimit('smart-import', 20, 60 * 1000); // 20 per minuut
+    if (!allowed) {
+      return NextResponse.json({ error: 'Te veel verzoeken. Probeer over een minuut opnieuw.' }, { status: 429 });
+    }
+
     const { searchParams } = new URL(request.url);
     const sector = searchParams.get('sector');
     const city = searchParams.get('city');

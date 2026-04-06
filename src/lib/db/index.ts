@@ -5,9 +5,9 @@ import * as schema from './schema';
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
-  console.warn('DATABASE_URL is not set. Database queries will fail.');
+  throw new Error('DATABASE_URL is not set. Cannot start without database connection.');
 }
 
-const sql = neon(databaseUrl || 'postgresql://placeholder:placeholder@localhost/placeholder');
+const sql = neon(databaseUrl);
 export const db = drizzle(sql, { schema });
 export type Database = typeof db;

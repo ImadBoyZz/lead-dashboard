@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq, desc } from 'drizzle-orm';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
+
+const pipelineCreateSchema = z.object({
+  businessId: z.string().uuid(),
+  stage: z.enum(['new', 'contacted', 'meeting', 'won', 'ignored']).optional(),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+  dealValue: z.number().min(0).optional(),
+});
 
 export async function GET() {
   try {
@@ -27,13 +35,17 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const parsed = pipelineCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    }
     const [entry] = await db
       .insert(schema.leadPipeline)
       .values({
-        businessId: body.businessId,
-        stage: body.stage ?? 'new',
-        priority: body.priority ?? 'medium',
-        dealValue: body.dealValue,
+        businessId: parsed.data.businessId,
+        stage: parsed.data.stage ?? 'new',
+        priority: parsed.data.priority ?? 'medium',
+        dealValue: parsed.data.dealValue,
       })
       .returning();
     return NextResponse.json(entry, { status: 201 });
