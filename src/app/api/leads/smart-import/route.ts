@@ -48,9 +48,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Sorteer op kwaliteitsscore
+    // Sorteer op kwaliteitsscore en beperk tot target
     allLeads.sort((a, b) => b.qualityScore - a.qualityScore);
-    const leads = allLeads;
+    const leads = allLeads.slice(0, target);
 
     // Deduplicate against existing businesses by googlePlaceId
     const placeIds = leads.map((l) => l.placeId);

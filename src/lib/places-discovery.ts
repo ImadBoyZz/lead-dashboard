@@ -475,8 +475,8 @@ export async function discoverLeads(
         allPlaces.push(...data.places);
       }
 
-      // Stop als er geen volgende pagina is of we genoeg hebben
-      if (!data.nextPageToken || allPlaces.length >= maxResults) break;
+      // Stop als er geen volgende pagina is
+      if (!data.nextPageToken) break;
       pageToken = data.nextPageToken;
     }
 
