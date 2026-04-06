@@ -4,10 +4,8 @@ import { eq, desc, and, or, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { Header } from "@/components/layout/header";
-import { PipelineBoard } from "@/components/pipeline/pipeline-board";
-import type { PipelineCardData } from "@/components/pipeline/pipeline-card";
 import { UrgentBanner } from "@/components/pipeline/urgent-banner";
-import { PipelineTabs } from "@/components/pipeline/pipeline-tabs";
+import { PipelineDashboard } from "@/components/pipeline/pipeline-dashboard";
 import type { PipelineLeadRow } from "@/components/pipeline/pipeline-tabs";
 import { getUrgentLeadsToday } from "@/lib/pipeline-logic";
 
@@ -63,17 +61,6 @@ export default async function PipelinePage() {
     }
   }
 
-  // Kanban cards
-  const cards: PipelineCardData[] = data.map((row) => ({
-    pipelineId: row.pipeline.id,
-    businessId: row.business.id,
-    name: row.business.name,
-    city: row.business.city,
-    stage: row.pipeline.stage,
-    priority: row.pipeline.priority,
-    stageChangedAt: row.pipeline.stageChangedAt,
-  }));
-
   // Tab list rows (richer data)
   const tabLeads: PipelineLeadRow[] = data.map((row) => {
     const outreach = latestOutreach.get(row.business.id);
@@ -89,7 +76,8 @@ export default async function PipelinePage() {
       wonValue: row.pipeline.wonValue,
       contactMethod: row.leadStatus?.contactMethod ?? null,
       lastOutreachChannel: outreach?.channel ?? null,
-      lastOutreachAt: outreach?.contactedAt ?? row.leadStatus?.contactedAt ?? null,
+      lastOutreachAt:
+        outreach?.contactedAt ?? row.leadStatus?.contactedAt ?? null,
       meetingAt: row.leadStatus?.meetingAt ?? null,
       stageChangedAt: row.pipeline.stageChangedAt,
       rejectionReason: row.pipeline.rejectionReason,
@@ -105,17 +93,14 @@ export default async function PipelinePage() {
     <div>
       <Header
         title="Pipeline"
-        description={`${cards.length} leads in pipeline`}
+        description={`${data.length} leads in pipeline`}
       />
 
-      {/* Actie vereist vandaag */}
+      {/* Compact urgency strip */}
       <UrgentBanner leads={urgentLeads} />
 
-      {/* Kanban board */}
-      <PipelineBoard initialData={cards} />
-
-      {/* Tabbed list views */}
-      <PipelineTabs leads={tabLeads} />
+      {/* Stats + tabbed lists */}
+      <PipelineDashboard leads={tabLeads} />
     </div>
   );
 }

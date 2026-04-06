@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Mail,
@@ -110,10 +110,23 @@ function formatDateTime(d: Date | string | null): string {
 
 interface PipelineTabsProps {
   leads: PipelineLeadRow[];
+  selectedStage?: string;
 }
 
-export function PipelineTabs({ leads }: PipelineTabsProps) {
-  const [activeTab, setActiveTab] = useState<TabValue>("contacted");
+export function PipelineTabs({ leads, selectedStage }: PipelineTabsProps) {
+  const [activeTab, setActiveTab] = useState<TabValue>(
+    (selectedStage as TabValue) || "contacted"
+  );
+
+  // Sync with external selectedStage changes (from stats click)
+  useEffect(() => {
+    if (selectedStage) {
+      const validTab = TABS.find((t) => t.value === selectedStage);
+      if (validTab) {
+        setActiveTab(validTab.value);
+      }
+    }
+  }, [selectedStage]);
   const [search, setSearch] = useState("");
   const [channelFilter, setChannelFilter] = useState("");
   const [sectorFilter, setSectorFilter] = useState("");
