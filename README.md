@@ -1,6 +1,6 @@
 # Lead Dashboard — Averis Solutions
 
-Een intern dashboard waarmee Averis Solutions automatisch potentiele klanten vindt in Vlaanderen en Nederland. Het systeem zoekt bedrijven die geen of een slechte website hebben en dus baat zouden hebben bij webdesign, AI of digitale diensten.
+Een intern dashboard waarmee Averis Solutions automatisch potentiele klanten vindt in Vlaanderen. Het systeem zoekt bedrijven die geen of een slechte website hebben en dus baat zouden hebben bij webdesign, AI of digitale diensten.
 
 ## Wat doet dit dashboard?
 
