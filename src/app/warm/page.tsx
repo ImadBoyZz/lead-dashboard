@@ -2,28 +2,70 @@ export const dynamic = 'force-dynamic';
 
 import Link from "next/link";
 import { Globe, ArrowUpRight } from "lucide-react";
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, desc, count, ilike, or, isNull, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { Header } from "@/components/layout/header";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatNumber } from "@/lib/utils";
-import { LEAD_STATUS_OPTIONS } from "@/lib/constants";
 import { WarmLeadActions } from "./warm-lead-actions";
+import { WarmLeadFilters } from "./warm-lead-filters";
+import { StatusSwitcher } from "./status-switcher";
 
-export default async function WarmLeadsPage() {
+interface PageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function WarmLeadsPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+
+  const sector = (params.sector as string) || undefined;
+  const status = (params.status as string) || undefined;
+  const hasWebsite = (params.hasWebsite as string) || undefined;
+  const province = (params.province as string) || undefined;
+  const search = (params.search as string) || undefined;
+
   const conditions = [
     eq(schema.businesses.optOut, false),
     eq(schema.businesses.blacklisted, false),
     eq(schema.businesses.leadTemperature, 'warm'),
   ];
 
+  if (sector) {
+    conditions.push(eq(schema.businesses.sector, sector));
+  }
+  if (search) {
+    conditions.push(
+      or(
+        ilike(schema.businesses.name, "%" + search + "%"),
+        ilike(schema.businesses.city, "%" + search + "%"),
+      )!,
+    );
+  }
+  if (hasWebsite === "true") {
+    conditions.push(isNotNull(schema.businesses.website));
+  } else if (hasWebsite === "false") {
+    conditions.push(isNull(schema.businesses.website));
+  }
+  if (province) {
+    conditions.push(eq(schema.businesses.province, province));
+  }
+  if (status) {
+    conditions.push(
+      eq(
+        schema.leadStatuses.status,
+        status as "new" | "contacted" | "replied" | "meeting" | "won" | "lost" | "disqualified",
+      ),
+    );
+  }
+
   const whereClause = and(...conditions);
 
   const [totalResult] = await db
     .select({ count: count() })
     .from(schema.businesses)
+    .leftJoin(schema.leadStatuses, eq(schema.businesses.id, schema.leadStatuses.businessId))
     .where(whereClause);
 
   const data = await db
@@ -36,16 +78,15 @@ export default async function WarmLeadsPage() {
     .where(whereClause)
     .orderBy(desc(schema.businesses.updatedAt));
 
-  function getStatusOption(value: string | undefined) {
-    if (!value) return null;
-    return LEAD_STATUS_OPTIONS.find((s) => s.value === value) ?? null;
-  }
-
   return (
     <div>
       <Header
         title="Warm Leads"
         description={formatNumber(totalResult.count) + " leads gefilterd"}
+      />
+
+      <WarmLeadFilters
+        filters={{ sector, status, hasWebsite, province, search }}
       />
 
       <Card>
@@ -65,12 +106,11 @@ export default async function WarmLeadsPage() {
               {data.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center text-muted">
-                    Nog geen warm leads — markeer leads vanuit Cold Leads met het groene vinkje
+                    Geen warm leads gevonden met deze filters
                   </td>
                 </tr>
               ) : (
                 data.map((row, i) => {
-                  const statusOpt = getStatusOption(row.status?.status);
                   return (
                     <tr
                       key={row.business.id}
@@ -109,13 +149,10 @@ export default async function WarmLeadsPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {statusOpt ? (
-                          <span className={"inline-flex items-center rounded-full text-xs font-medium px-2.5 py-0.5 " + statusOpt.color}>
-                            {statusOpt.label}
-                          </span>
-                        ) : (
-                          <Badge>Nieuw</Badge>
-                        )}
+                        <StatusSwitcher
+                          leadId={row.business.id}
+                          currentStatus={row.status?.status}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <WarmLeadActions leadId={row.business.id} />

@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, or, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { Header } from "@/components/layout/header";
@@ -15,7 +15,15 @@ export default async function PipelinePage() {
     })
     .from(schema.leadPipeline)
     .innerJoin(schema.businesses, eq(schema.leadPipeline.businessId, schema.businesses.id))
-    .where(eq(schema.businesses.optOut, false))
+    .where(
+      and(
+        eq(schema.businesses.optOut, false),
+        or(
+          ne(schema.leadPipeline.stage, 'new'),
+          eq(schema.businesses.leadTemperature, 'warm'),
+        ),
+      ),
+    )
     .orderBy(desc(schema.businesses.createdAt));
 
   const cards: PipelineCardData[] = data.map((row) => ({

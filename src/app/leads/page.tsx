@@ -13,8 +13,8 @@ import { Pagination } from "@/components/ui/pagination";
 import { SmartImportButton } from "@/components/leads/smart-import-button";
 import { LeadFilters } from "@/components/leads/lead-filters";
 import { LeadActions } from "@/components/leads/lead-actions";
-import { formatDate, formatNumber } from "@/lib/utils";
-import { LEAD_STATUS_OPTIONS, ITEMS_PER_PAGE } from "@/lib/constants";
+import { formatNumber } from "@/lib/utils";
+import { ITEMS_PER_PAGE } from "@/lib/constants";
 
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -155,17 +155,6 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   if (sort && sort !== "recent") filterParams.sort = sort;
   if (order && order !== "desc") filterParams.order = order;
 
-  function getStatusOption(value: string | undefined) {
-    if (!value) return null;
-    return LEAD_STATUS_OPTIONS.find((s) => s.value === value) ?? null;
-  }
-
-  function getPagespeedColor(score: number | null) {
-    if (score === null) return "text-muted";
-    if (score >= 90) return "text-green-600";
-    if (score >= 50) return "text-amber-600";
-    return "text-red-600";
-  }
 
   const exportParams = new URLSearchParams(filterParams);
   const exportUrl = "/api/export?" + exportParams.toString();
@@ -212,20 +201,18 @@ export default async function LeadsPage({ searchParams }: PageProps) {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Sector</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Locatie</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Website</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Acties</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-card-border">
               {data.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-muted">
+                  <td colSpan={5} className="px-4 py-12 text-center text-muted">
                     Geen leads gevonden
                   </td>
                 </tr>
               ) : (
                 data.map((row, i) => {
-                  const statusOpt = getStatusOption(row.status?.status);
                   return (
                     <tr
                       key={row.business.id}
@@ -270,15 +257,6 @@ export default async function LeadsPage({ searchParams }: PageProps) {
                           </a>
                         ) : (
                           <Badge>Geen website</Badge>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {statusOpt ? (
-                          <span className={"inline-flex items-center rounded-full text-xs font-medium px-2.5 py-0.5 " + statusOpt.color}>
-                            {statusOpt.label}
-                          </span>
-                        ) : (
-                          <Badge>Nieuw</Badge>
                         )}
                       </td>
                       <td className="px-4 py-3">
