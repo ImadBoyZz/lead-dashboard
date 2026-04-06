@@ -65,7 +65,7 @@ Het dashboard respecteert privacyregels:
 |---|---|
 | **Dashboard** | Overzicht met statistieken (totaal leads, nieuwe leads, score-verdeling) |
 | **Cold Leads** | Leads zoeken, importeren, filteren en beheren |
-| **Warm Leads** | Leads die al gecontacteerd zijn of interesse tonen |
+| **Warm Leads** | Passende Leads voor Averis Solutions |
 | **Pipeline** | Visueel bord met alle leads per fase (sleep ze tussen kolommen) |
 | **Logs** | Geschiedenis van alle imports |
 | **Herinneringen** | Overzicht van geplande opvolgingen |
