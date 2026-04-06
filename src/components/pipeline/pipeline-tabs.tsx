@@ -331,15 +331,8 @@ function getColumnsForTab(tab: TabValue) {
       return [
         ...baseColumns,
         {
-          key: "contact",
-          header: "Contact",
-          render: (item: PipelineLeadRow) => (
-            <ContactInfo lead={item} />
-          ),
-        },
-        {
           key: "channel",
-          header: "Kanaal",
+          header: "Contact",
           render: (item: PipelineLeadRow) => (
             <ChannelBadge channel={item.lastOutreachChannel ?? item.contactMethod} />
           ),
