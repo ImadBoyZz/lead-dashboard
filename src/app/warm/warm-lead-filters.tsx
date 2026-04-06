@@ -72,7 +72,7 @@ export function WarmLeadFilters({ filters }: WarmLeadFiltersProps) {
         <Select
           options={[
             { value: "", label: "Alle omgevingen" },
-            ...BELGIAN_PROVINCES.map((p) => ({ value: p, label: p })),
+            ...['Antwerpen', 'Limburg', 'Oost-Vlaanderen', 'West-Vlaanderen', 'Vlaams-Brabant', 'Brussel'].map((p) => ({ value: p, label: p })),
           ]}
           value={filters.province ?? ""}
           onChange={(e) => updateFilter("province", e.target.value)}
