@@ -30,7 +30,7 @@ export function MeetingEditor({ leadId, currentMeetingAt }: MeetingEditorProps) 
       const res = await fetch(`/api/leads/${leadId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meetingAt: dateTime }),
+        body: JSON.stringify({ meetingAt: dateTime, status: "meeting" }),
       });
       if (res.ok) {
         setEditing(false);
