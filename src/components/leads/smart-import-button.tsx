@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Loader2, Download, MapPin, Star, Globe, ExternalLink } from "lucide-react";
+import { Search, Loader2, Download, MapPin, Star, Globe, ExternalLink, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ALL_SECTORS } from "@/lib/places-discovery";
 
@@ -38,7 +38,7 @@ export function SmartImportButton() {
   const [preview, setPreview] = useState<PreviewLead[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<{ imported: number; duplicates: number } | null>(null);
-  const [alreadyImported, setAlreadyImported] = useState(0);
+
 
   async function handleSearch() {
     if (!sector || !city) return;
@@ -53,7 +53,6 @@ export function SmartImportButton() {
       );
       const data = await res.json();
       setPreview(data.leads ?? []);
-      setAlreadyImported(data.alreadyImported ?? 0);
       setSelected(new Set((data.leads ?? []).map((l: PreviewLead) => l.placeId)));
     } catch {
       setPreview([]);
@@ -225,107 +224,124 @@ export function SmartImportButton() {
         </div>
       )}
 
-      {/* Preview */}
+      {/* Preview Modal */}
       {preview !== null && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted">
-              {preview.length} nieuwe leads gevonden
-              {alreadyImported > 0 && (
-                <span className="ml-1 text-xs">({alreadyImported} al geïmporteerd)</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setPreview(null)}
+          />
+          {/* Modal */}
+          <div className="relative z-10 w-full max-w-2xl max-h-[85vh] flex flex-col rounded-lg border border-border bg-card shadow-2xl mx-4">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div className="text-sm font-medium">
+                {preview.length} leads gevonden
+              </div>
+              <div className="flex items-center gap-3">
+                {preview.length > 0 && (
+                  <>
+                    <button
+                      onClick={toggleAll}
+                      className="text-xs text-accent hover:underline"
+                    >
+                      {selected.size === preview.length ? "Deselecteer alles" : "Selecteer alles"}
+                    </button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleImport}
+                      disabled={importing || selected.size === 0}
+                    >
+                      {importing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
+                      {importing
+                        ? "Importeren..."
+                        : `Importeer ${selected.size} leads`}
+                    </Button>
+                  </>
+                )}
+                <button
+                  onClick={() => setPreview(null)}
+                  className="rounded-md p-1 text-muted hover:bg-muted/20 hover:text-foreground transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto flex-1">
+              {preview.length === 0 ? (
+                <p className="px-5 py-8 text-sm text-muted text-center">
+                  Geen nieuwe leads gevonden voor deze zoekopdracht.
+                </p>
+              ) : (
+                <div className="divide-y divide-border">
+                  {preview.map((lead) => (
+                    <label
+                      key={lead.placeId}
+                      className="flex cursor-pointer items-start gap-3 px-5 py-3 hover:bg-muted/30 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.has(lead.placeId)}
+                        onChange={() => toggleSelect(lead.placeId)}
+                        className="mt-1 rounded border-border"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm truncate">
+                            {lead.name}
+                          </span>
+                          <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
+                            {lead.qualityScore}pt
+                          </span>
+                          {lead.chainWarning && (
+                            <span className="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
+                              ⚠ {lead.chainWarning}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {lead.address}
+                          </span>
+                          {lead.rating !== null && (
+                            <span className="flex items-center gap-1">
+                              <Star className="h-3 w-3 text-yellow-500" />
+                              {lead.rating} ({lead.reviewCount} reviews)
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Globe className="h-3 w-3" />
+                            {lead.hasWebsite ? "Heeft website" : "Geen website"}
+                          </span>
+                          {lead.googleMapsUri && (
+                            <a
+                              href={lead.googleMapsUri}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-1 text-accent hover:underline"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              Maps
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
               )}
             </div>
-            {preview.length > 0 && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={toggleAll}
-                  className="text-xs text-accent hover:underline"
-                >
-                  {selected.size === preview.length ? "Deselecteer alles" : "Selecteer alles"}
-                </button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleImport}
-                  disabled={importing || selected.size === 0}
-                >
-                  {importing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4" />
-                  )}
-                  {importing
-                    ? "Importeren..."
-                    : `Importeer ${selected.size} leads`}
-                </Button>
-              </div>
-            )}
           </div>
-
-          {preview.length === 0 ? (
-            <p className="text-sm text-muted">
-              Geen nieuwe leads gevonden voor deze zoekopdracht.
-            </p>
-          ) : (
-            <div className="divide-y divide-border rounded-md border border-border">
-              {preview.map((lead) => (
-                <label
-                  key={lead.placeId}
-                  className="flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected.has(lead.placeId)}
-                    onChange={() => toggleSelect(lead.placeId)}
-                    className="mt-1 rounded border-border"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate">
-                        {lead.name}
-                      </span>
-                      <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
-                        {lead.qualityScore}pt
-                      </span>
-                      {lead.chainWarning && (
-                        <span className="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
-                          ⚠ {lead.chainWarning}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {lead.address}
-                      </span>
-                      {lead.rating !== null && (
-                        <span className="flex items-center gap-1">
-                          <Star className="h-3 w-3 text-yellow-500" />
-                          {lead.rating} ({lead.reviewCount} reviews)
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1">
-                        <Globe className="h-3 w-3" />
-                        {lead.hasWebsite ? "Heeft website" : "Geen website"}
-                      </span>
-                      {lead.googleMapsUri && (
-                        <a
-                          href={lead.googleMapsUri}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1 text-accent hover:underline"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          Maps
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>
