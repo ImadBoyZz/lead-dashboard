@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import Link from "next/link";
 import { Globe, ArrowUpRight } from "lucide-react";
-import { eq, and, desc, count, ilike, or, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, desc, count, ilike, or, isNull, isNotNull, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { Header } from "@/components/layout/header";
@@ -53,7 +53,22 @@ export default async function WarmLeadsPage({ searchParams }: PageProps) {
     conditions.push(isNull(schema.businesses.website));
   }
   if (province) {
-    conditions.push(eq(schema.businesses.province, province));
+    // Match on province field OR city (province is often null for Google Places data)
+    const provinceCities: Record<string, string[]> = {
+      'Oost-Vlaanderen': ['Aalst', 'Gent', 'Dendermonde', 'Sint-Niklaas', 'Lokeren', 'Wetteren', 'Ninove', 'Zele', 'Hamme', 'Geraardsbergen', 'Ronse', 'Zottegem', 'Oudenaarde', 'Eeklo', 'Deinze', 'Temse', 'Beveren', 'Kruibeke', 'Waasmunster'],
+      'West-Vlaanderen': ['Brugge', 'Kortrijk', 'Oostende', 'Roeselare', 'Ieper', 'Waregem', 'Knokke-Heist', 'Blankenberge', 'Torhout', 'Diksmuide', 'Poperinge', 'Menen', 'Harelbeke', 'Izegem', 'Tielt'],
+      'Antwerpen': ['Antwerpen', 'Mechelen', 'Turnhout', 'Lier', 'Herentals', 'Mol', 'Geel', 'Boom', 'Brasschaat', 'Schoten', 'Mortsel', 'Edegem', 'Kontich', 'Wilrijk', 'Berchem', 'Hoboken', 'Deurne', 'Borgerhout', 'Merksem', 'Ekeren'],
+      'Limburg': ['Hasselt', 'Genk', 'Sint-Truiden', 'Tongeren', 'Beringen', 'Lommel', 'Maaseik', 'Maasmechelen', 'Diepenbeek', 'Bilzen', 'Leopoldsburg'],
+      'Vlaams-Brabant': ['Leuven', 'Vilvoorde', 'Halle', 'Aarschot', 'Tienen', 'Diest', 'Zaventem', 'Grimbergen', 'Machelen', 'Overijse', 'Tervuren'],
+      'Brussel': ['Brussel', 'Brussels', 'Bruxelles', 'Schaarbeek', 'Anderlecht', 'Molenbeek', 'Elsene', 'Ixelles', 'Etterbeek', 'Sint-Gillis', 'Ukkel', 'Vorst', 'Jette', 'Ganshoren', 'Koekelberg', 'Sint-Jans-Molenbeek', 'Sint-Joost-ten-Node', 'Watermaal-Bosvoorde', 'Oudergem', 'Sint-Lambrechts-Woluwe', 'Sint-Pieters-Woluwe', 'Evere', 'Haren', 'Neder-Over-Heembeek'],
+    };
+    const cities = provinceCities[province] ?? [];
+    conditions.push(
+      or(
+        eq(schema.businesses.province, province),
+        ...(cities.length > 0 ? [inArray(schema.businesses.city, cities)] : []),
+      )!,
+    );
   }
   if (status) {
     conditions.push(
