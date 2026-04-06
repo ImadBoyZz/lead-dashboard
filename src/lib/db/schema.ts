@@ -26,6 +26,7 @@ export const dataSourceEnum = pgEnum('data_source', [
 export const leadStatusEnum = pgEnum('lead_status', [
   'new',
   'contacted',
+  'quote_sent',
   'replied',
   'meeting',
   'won',
@@ -281,7 +282,7 @@ export const statusHistoryRelations = relations(statusHistory, ({ one }) => ({
 // ── Fase 2: Pipeline & Outreach Enums ─────────────────
 
 export const pipelineStageEnum = pgEnum('pipeline_stage', [
-  'new', 'contacted', 'meeting', 'won', 'ignored',
+  'new', 'contacted', 'quote_sent', 'meeting', 'won', 'ignored',
 ]);
 
 export const outreachChannelEnum = pgEnum('outreach_channel', [

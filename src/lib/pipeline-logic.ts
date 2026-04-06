@@ -1,8 +1,8 @@
-import { eq, and, notInArray, count, sql } from 'drizzle-orm';
+import { eq, and, or, notInArray, count, sql, lte } from 'drizzle-orm';
 import { db } from './db';
 import * as schema from './db/schema';
 
-type PipelineStage = 'new' | 'contacted' | 'meeting' | 'won' | 'ignored';
+type PipelineStage = 'new' | 'contacted' | 'quote_sent' | 'meeting' | 'won' | 'ignored';
 type RejectionReason = 'no_budget' | 'no_interest' | 'has_supplier' | 'bad_timing' | 'no_response' | 'other';
 
 const MAX_ACTIVE_LEADS = 15;
@@ -11,6 +11,7 @@ const CLOSED_STAGES: PipelineStage[] = ['won', 'ignored'];
 const STAGE_TO_STATUS: Record<string, string> = {
   new: 'new',
   contacted: 'contacted',
+  quote_sent: 'quote_sent',
   meeting: 'meeting',
   won: 'won',
   ignored: 'lost',
@@ -79,6 +80,103 @@ export async function autoTransitionOnOutreach(
   }
 
   return null;
+}
+
+// ── Urgentie: "Actie vereist vandaag" ────────────────
+
+export type UrgentLead = {
+  businessId: string;
+  businessName: string;
+  city: string | null;
+  stage: string;
+  priority: string;
+  urgencyType: 'follow_up' | 'reminder';
+  dueDate: Date;
+  detail: string | null;
+};
+
+export async function getUrgentLeadsToday(): Promise<UrgentLead[]> {
+  const now = new Date();
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+  // Leads met vervallen of vandaag due follow-ups
+  const followUps = await db
+    .select({
+      businessId: schema.businesses.id,
+      businessName: schema.businesses.name,
+      city: schema.businesses.city,
+      stage: schema.leadPipeline.stage,
+      priority: schema.leadPipeline.priority,
+      dueDate: schema.leadPipeline.nextFollowUpAt,
+      detail: schema.leadPipeline.followUpNote,
+    })
+    .from(schema.leadPipeline)
+    .innerJoin(schema.businesses, eq(schema.leadPipeline.businessId, schema.businesses.id))
+    .where(
+      and(
+        lte(schema.leadPipeline.nextFollowUpAt, endOfDay),
+        eq(schema.leadPipeline.frozen, false),
+        notInArray(schema.leadPipeline.stage, CLOSED_STAGES),
+      ),
+    )
+    .limit(10);
+
+  // Reminders die vandaag due zijn
+  const remindersDue = await db
+    .select({
+      businessId: schema.businesses.id,
+      businessName: schema.businesses.name,
+      city: schema.businesses.city,
+      stage: schema.leadPipeline.stage,
+      priority: schema.leadPipeline.priority,
+      dueDate: schema.reminders.dueDate,
+      detail: schema.reminders.title,
+    })
+    .from(schema.reminders)
+    .innerJoin(schema.businesses, eq(schema.reminders.businessId, schema.businesses.id))
+    .innerJoin(schema.leadPipeline, eq(schema.leadPipeline.businessId, schema.businesses.id))
+    .where(
+      and(
+        eq(schema.reminders.status, 'pending'),
+        lte(schema.reminders.dueDate, endOfDay),
+      ),
+    )
+    .limit(10);
+
+  const results: UrgentLead[] = [
+    ...followUps
+      .filter((f) => f.dueDate !== null)
+      .map((f) => ({
+        businessId: f.businessId,
+        businessName: f.businessName,
+        city: f.city,
+        stage: f.stage,
+        priority: f.priority,
+        urgencyType: 'follow_up' as const,
+        dueDate: f.dueDate!,
+        detail: f.detail,
+      })),
+    ...remindersDue.map((r) => ({
+      businessId: r.businessId,
+      businessName: r.businessName,
+      city: r.city,
+      stage: r.stage,
+      priority: r.priority,
+      urgencyType: 'reminder' as const,
+      dueDate: r.dueDate,
+      detail: r.detail,
+    })),
+  ];
+
+  // Deduplicate by businessId, keep earliest due
+  const seen = new Map<string, UrgentLead>();
+  for (const item of results.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())) {
+    if (!seen.has(item.businessId)) {
+      seen.set(item.businessId, item);
+    }
+  }
+
+  return Array.from(seen.values()).slice(0, 5);
 }
 
 // ── Fase 3: Prioriteitswachtrij ──────────────────────

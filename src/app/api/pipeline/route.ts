@@ -6,7 +6,7 @@ import * as schema from '@/lib/db/schema';
 
 const pipelineCreateSchema = z.object({
   businessId: z.string().uuid(),
-  stage: z.enum(['new', 'contacted', 'meeting', 'won', 'ignored']).optional(),
+  stage: z.enum(['new', 'contacted', 'quote_sent', 'meeting', 'won', 'ignored']).optional(),
   priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
   dealValue: z.number().min(0).optional(),
 });

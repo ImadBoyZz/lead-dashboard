@@ -34,7 +34,7 @@ export type LeadWithDetails = Business & {
 export type LeadFilters = {
   country?: 'BE' | 'NL';
   province?: string;
-  status?: 'new' | 'contacted' | 'replied' | 'meeting' | 'won' | 'lost' | 'disqualified';
+  status?: 'new' | 'contacted' | 'quote_sent' | 'replied' | 'meeting' | 'won' | 'lost' | 'disqualified';
   scoreMin?: number;
   scoreMax?: number;
   search?: string;
