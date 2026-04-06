@@ -83,6 +83,10 @@ export default async function PipelinePage() {
       rejectionReason: row.pipeline.rejectionReason,
       estimatedCloseDate: row.pipeline.estimatedCloseDate,
       nextFollowUpAt: row.pipeline.nextFollowUpAt,
+      email: row.business.email,
+      phone: row.business.phone,
+      website: row.business.website,
+      facebook: row.business.facebook,
     };
   });
 

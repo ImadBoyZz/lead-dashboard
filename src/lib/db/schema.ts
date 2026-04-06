@@ -61,6 +61,7 @@ export const businesses = pgTable(
     website: text('website'),
     email: text('email'),
     phone: text('phone'),
+    facebook: text('facebook'),
     googlePlaceId: text('google_place_id'),
     googleRating: real('google_rating'),
     googleReviewCount: integer('google_review_count'),

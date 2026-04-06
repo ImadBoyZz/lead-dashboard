@@ -88,6 +88,10 @@ const patchSchema = z.object({
     ])
     .optional(),
   meetingAt: z.string().optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  phone: z.string().max(30).optional().or(z.literal('')),
+  website: z.string().max(500).optional().or(z.literal('')),
+  facebook: z.string().max(500).optional().or(z.literal('')),
   note: z.string().optional(),
   optOut: z.boolean().optional(),
   leadTemperature: z.enum(['cold', 'warm']).optional(),
@@ -110,7 +114,7 @@ export async function PATCH(
       );
     }
 
-    const { status, meetingAt, note, optOut, leadTemperature, blacklisted } = parsed.data;
+    const { status, meetingAt, email, phone, website, facebook, note, optOut, leadTemperature, blacklisted } = parsed.data;
 
     // Verify business exists
     const [business] = await db
@@ -173,6 +177,20 @@ export async function PATCH(
           })
           .where(eq(schema.leadPipeline.businessId, id));
       }
+    }
+
+    // Handle contact info updates
+    if (email !== undefined || phone !== undefined || website !== undefined || facebook !== undefined) {
+      const contactUpdate: Record<string, unknown> = { updatedAt: new Date() };
+      if (email !== undefined) contactUpdate.email = email || null;
+      if (phone !== undefined) contactUpdate.phone = phone || null;
+      if (website !== undefined) contactUpdate.website = website || null;
+      if (facebook !== undefined) contactUpdate.facebook = facebook || null;
+
+      await db
+        .update(schema.businesses)
+        .set(contactUpdate)
+        .where(eq(schema.businesses.id, id));
     }
 
     // Handle meetingAt update

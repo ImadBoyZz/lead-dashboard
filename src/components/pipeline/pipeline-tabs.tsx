@@ -37,6 +37,10 @@ export interface PipelineLeadRow {
   rejectionReason: string | null;
   estimatedCloseDate: string | null;
   nextFollowUpAt: Date | string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  facebook: string | null;
 }
 
 // ── Tab config ────────────────────────────────────────
@@ -327,6 +331,13 @@ function getColumnsForTab(tab: TabValue) {
       return [
         ...baseColumns,
         {
+          key: "contact",
+          header: "Contact",
+          render: (item: PipelineLeadRow) => (
+            <ContactInfo lead={item} />
+          ),
+        },
+        {
           key: "channel",
           header: "Kanaal",
           render: (item: PipelineLeadRow) => (
@@ -348,11 +359,6 @@ function getColumnsForTab(tab: TabValue) {
           render: (item: PipelineLeadRow) => (
             <span className="text-sm text-muted">{item.sector ?? "—"}</span>
           ),
-        },
-        {
-          key: "priority",
-          header: "Prioriteit",
-          render: (item: PipelineLeadRow) => <PriorityBadge priority={item.priority} />,
         },
       ];
 
@@ -494,7 +500,7 @@ function getColumnsForTab(tab: TabValue) {
 // ── Sub-components ────────────────────────────────────
 
 import { PRIORITY_OPTIONS } from "@/lib/constants";
-import { Pencil, Check, Loader2 } from "lucide-react";
+import { Pencil, Check, Loader2, Globe, Link2, Plus, X as XIcon } from "lucide-react";
 
 function InlineMeetingEditor({
   businessId,
@@ -574,6 +580,139 @@ function InlineMeetingEditor({
       {currentDate ? formatDateTime(currentDate) : "Datum instellen"}
       <Pencil className="h-3 w-3 text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
     </button>
+  );
+}
+
+function ContactInfo({ lead }: { lead: PipelineLeadRow }) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [email, setEmail] = useState(lead.email ?? "");
+  const [phone, setPhone] = useState(lead.phone ?? "");
+  const [website, setWebsite] = useState(lead.website ?? "");
+  const [facebook, setFacebook] = useState(lead.facebook ?? "");
+
+  const hasAny = lead.email || lead.phone || lead.website || lead.facebook;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await fetch(`/api/leads/${lead.businessId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email || "",
+          phone: phone || "",
+          website: website || "",
+          facebook: facebook || "",
+        }),
+      });
+      setEditing(false);
+      window.location.reload();
+    } catch {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="absolute z-40 left-0 top-full mt-1 w-72 rounded-xl border border-card-border bg-white shadow-xl p-4 space-y-2.5">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-semibold text-foreground">Contact bewerken</span>
+          <button onClick={() => setEditing(false)} className="text-muted hover:text-foreground">
+            <XIcon className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div>
+          <label className="flex items-center gap-1 text-[10px] font-medium text-muted mb-0.5">
+            <Mail className="h-3 w-3" /> Email
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="email@voorbeeld.be"
+            className="w-full rounded border border-input-border bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
+          />
+        </div>
+        <div>
+          <label className="flex items-center gap-1 text-[10px] font-medium text-muted mb-0.5">
+            <Phone className="h-3 w-3" /> Telefoon
+          </label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+32 ..."
+            className="w-full rounded border border-input-border bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
+          />
+        </div>
+        <div>
+          <label className="flex items-center gap-1 text-[10px] font-medium text-muted mb-0.5">
+            <Globe className="h-3 w-3" /> Website
+          </label>
+          <input
+            type="url"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            placeholder="https://..."
+            className="w-full rounded border border-input-border bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
+          />
+        </div>
+        <div>
+          <label className="flex items-center gap-1 text-[10px] font-medium text-muted mb-0.5">
+            <Link2 className="h-3 w-3" /> Facebook
+          </label>
+          <input
+            type="url"
+            value={facebook}
+            onChange={(e) => setFacebook(e.target.value)}
+            placeholder="https://facebook.com/..."
+            className="w-full rounded border border-input-border bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
+          />
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+          Opslaan
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative flex items-center gap-1">
+      {lead.email && (
+        <a href={`mailto:${lead.email}`} title={lead.email} className="text-muted hover:text-accent transition-colors">
+          <Mail className="h-3.5 w-3.5" />
+        </a>
+      )}
+      {lead.phone && (
+        <a href={`tel:${lead.phone}`} title={lead.phone} className="text-muted hover:text-accent transition-colors">
+          <Phone className="h-3.5 w-3.5" />
+        </a>
+      )}
+      {lead.website && (
+        <a href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`} target="_blank" rel="noopener noreferrer" title={lead.website} className="text-muted hover:text-accent transition-colors">
+          <Globe className="h-3.5 w-3.5" />
+        </a>
+      )}
+      {lead.facebook && (
+        <a href={lead.facebook} target="_blank" rel="noopener noreferrer" title="Facebook" className="text-muted hover:text-accent transition-colors">
+          <Link2 className="h-3.5 w-3.5" />
+        </a>
+      )}
+      <button
+        onClick={() => setEditing(true)}
+        className="inline-flex items-center justify-center rounded-full h-5 w-5 text-muted hover:text-accent hover:bg-accent/10 transition-all"
+        title="Contact bewerken"
+      >
+        {hasAny ? <Pencil className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+      </button>
+      {editing && null}
+    </div>
   );
 }
 
