@@ -30,6 +30,10 @@ export default async function WarmLeadsPage({ searchParams }: PageProps) {
     eq(schema.businesses.optOut, false),
     eq(schema.businesses.blacklisted, false),
     eq(schema.businesses.leadTemperature, 'warm'),
+    or(
+      eq(schema.leadStatuses.status, 'new'),
+      isNull(schema.leadStatuses.status),
+    )!,
   ];
 
   if (sector) {
