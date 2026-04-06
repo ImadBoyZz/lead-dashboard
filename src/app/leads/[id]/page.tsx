@@ -1,9 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import {
-  ArrowLeft,
   Globe,
   Mail,
   Phone,
@@ -32,6 +30,7 @@ import { DeleteNoteButton } from "@/components/notes/delete-note-button";
 import { CopyButton } from "./copy-button";
 import { ScanButton } from "./scan-button";
 import { DetailLeadActions } from "./detail-lead-actions";
+import { BackButton } from "./back-button";
 import type { ScoreBreakdown } from "@/types";
 
 interface PageProps {
@@ -129,13 +128,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
   return (
     <div>
       <div className="mb-4">
-        <Link
-          href="/leads"
-          className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Terug naar leads
-        </Link>
+        <BackButton />
       </div>
 
       <Header title={business.name} description={business.registryId + " \u00B7 " + (business.legalForm ?? "Onbekend")} />
