@@ -21,7 +21,7 @@ export default async function SettingsPage() {
     .select()
     .from(schema.importLogs)
     .orderBy(desc(schema.importLogs.startedAt))
-    .limit(20);
+    .limit(5);
 
   // Fetch system stats
   const [totalBusinesses] = await db
@@ -93,7 +93,7 @@ export default async function SettingsPage() {
 
       <div className="space-y-6">
         {/* Import Status */}
-        <Card title="Import Status" description="Overzicht van alle data imports">
+        <Card title="Import Status" description="Laatste 5 imports">
           {imports.length === 0 ? (
             <p className="text-sm text-muted">Nog geen imports uitgevoerd</p>
           ) : (
