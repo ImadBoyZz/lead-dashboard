@@ -434,7 +434,7 @@ export async function discoverLeads(
 
   const allPlaces: PlacesApiPlace[] = [];
   let pageToken: string | undefined;
-  const maxPages = Math.ceil(maxResults / 20); // max pagina's nodig om target te halen
+  const maxPages = 3; // altijd tot 3 pagina's per query (60 resultaten max)
 
   try {
     for (let page = 0; page < maxPages; page++) {
