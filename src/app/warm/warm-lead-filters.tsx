@@ -4,7 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { BELGIAN_PROVINCES, DUTCH_PROVINCES } from "@/lib/constants";
+import { BELGIAN_PROVINCES } from "@/lib/constants";
 import { ALL_SECTORS } from "@/lib/places-discovery";
 import { Search } from "lucide-react";
 import { useRef } from "react";
@@ -72,7 +72,7 @@ export function WarmLeadFilters({ filters }: WarmLeadFiltersProps) {
         <Select
           options={[
             { value: "", label: "Alle omgevingen" },
-            ...[...BELGIAN_PROVINCES, ...DUTCH_PROVINCES].map((p) => ({ value: p, label: p })),
+            ...BELGIAN_PROVINCES.map((p) => ({ value: p, label: p })),
           ]}
           value={filters.province ?? ""}
           onChange={(e) => updateFilter("province", e.target.value)}
