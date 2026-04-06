@@ -201,7 +201,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
                 </span>
               </div>
 
-              <StatusChanger leadId={id} currentStatus={currentStatus} />
+              <StatusChanger leadId={id} currentStatus={currentStatus} leadName={business.name} />
 
               {/* Afspraak datum/tijd */}
               <div className="mt-4 pt-4 border-t border-card-border">

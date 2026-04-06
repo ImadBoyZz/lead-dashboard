@@ -14,6 +14,7 @@ import {
 import { PipelineColumn } from "./pipeline-column";
 import { PipelineCard, type PipelineCardData } from "./pipeline-card";
 import { MeetingDateModal } from "./meeting-date-modal";
+import { ContactMethodModal } from "./contact-method-modal";
 import { PIPELINE_STAGE_OPTIONS } from "@/lib/constants";
 
 interface PipelineBoardProps {
@@ -31,6 +32,15 @@ export function PipelineBoard({ initialData }: PipelineBoardProps) {
     leadName: string;
     oldStage: string;
   }>({ open: false, cardId: "", leadName: "", oldStage: "" });
+
+  // Contact method modal state
+  const [contactModal, setContactModal] = useState<{
+    open: boolean;
+    cardId: string;
+    businessId: string;
+    leadName: string;
+    oldStage: string;
+  }>({ open: false, cardId: "", businessId: "", leadName: "", oldStage: "" });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -51,9 +61,8 @@ export function PipelineBoard({ initialData }: PipelineBoardProps) {
     const card = cards.find((c) => c.pipelineId === cardId);
     if (!card || card.stage === newStage) return;
 
-    // If dragging to "meeting", show date modal instead of immediate update
+    // If dragging to "meeting", show date modal
     if (newStage === "meeting") {
-      // Optimistic: move card visually
       setCards((prev) =>
         prev.map((c) =>
           c.pipelineId === cardId ? { ...c, stage: newStage } : c
@@ -62,6 +71,23 @@ export function PipelineBoard({ initialData }: PipelineBoardProps) {
       setMeetingModal({
         open: true,
         cardId,
+        leadName: card.name,
+        oldStage: card.stage,
+      });
+      return;
+    }
+
+    // If dragging to "contacted", show channel modal
+    if (newStage === "contacted") {
+      setCards((prev) =>
+        prev.map((c) =>
+          c.pipelineId === cardId ? { ...c, stage: newStage } : c
+        )
+      );
+      setContactModal({
+        open: true,
+        cardId,
+        businessId: card.businessId,
         leadName: card.name,
         oldStage: card.stage,
       });
@@ -111,7 +137,6 @@ export function PipelineBoard({ initialData }: PipelineBoardProps) {
   }
 
   function handleMeetingCancel() {
-    // Revert the optimistic move
     const { cardId, oldStage } = meetingModal;
     setCards((prev) =>
       prev.map((c) =>
@@ -119,6 +144,38 @@ export function PipelineBoard({ initialData }: PipelineBoardProps) {
       )
     );
     setMeetingModal((prev) => ({ ...prev, open: false }));
+  }
+
+  async function handleContactMethodSelect(channel: string) {
+    const { cardId, businessId, oldStage } = contactModal;
+    setContactModal((prev) => ({ ...prev, open: false }));
+
+    // Move card + log outreach
+    await moveCard(cardId, "contacted", oldStage);
+
+    // Log the outreach with the selected channel
+    try {
+      await fetch(`/api/leads/${businessId}/outreach`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel,
+          outcome: "Gecontacteerd via " + channel,
+        }),
+      });
+    } catch {
+      // Non-critical, card already moved
+    }
+  }
+
+  function handleContactMethodCancel() {
+    const { cardId, oldStage } = contactModal;
+    setCards((prev) =>
+      prev.map((c) =>
+        c.pipelineId === cardId ? { ...c, stage: oldStage } : c
+      )
+    );
+    setContactModal((prev) => ({ ...prev, open: false }));
   }
 
   // Group by stage
@@ -162,6 +219,13 @@ export function PipelineBoard({ initialData }: PipelineBoardProps) {
         leadName={meetingModal.leadName}
         onConfirm={handleMeetingConfirm}
         onCancel={handleMeetingCancel}
+      />
+
+      <ContactMethodModal
+        open={contactModal.open}
+        leadName={contactModal.leadName}
+        onSelect={handleContactMethodSelect}
+        onCancel={handleContactMethodCancel}
       />
     </>
   );
