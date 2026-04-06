@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { discoverLeads, buildSearchQuery, buildSearchQueries, detectBatchDuplicates } from '@/lib/places-discovery';
+import { discoverLeads, buildSearchQueries, detectBatchDuplicates } from '@/lib/places-discovery';
 import { computeScore } from '@/lib/scoring';
 import { rateLimit } from '@/lib/rate-limit';
 
@@ -105,15 +105,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const query = buildSearchQuery(sector, city);
-    const { leads } = await discoverLeads(query, count, city);
+    // Gebruik dezelfde multi-query logica als de GET preview
+    const subsectors = buildSearchQueries(sector, city, 99);
+    const selectedSet = selectedPlaceIds ? new Set(selectedPlaceIds) : null;
+    const seenPlaceIds = new Set<string>();
+    let allLeads: Awaited<ReturnType<typeof discoverLeads>>['leads'] = [];
 
-    // Filter by selectedPlaceIds if provided, otherwise take all up to count
-    let toImport = selectedPlaceIds
-      ? leads.filter((l) => selectedPlaceIds.includes(l.placeId))
-      : leads;
+    for (const query of subsectors) {
+      if (allLeads.length >= count) break;
+      const result = await discoverLeads(query, 60, city);
+      for (const lead of result.leads) {
+        if (!seenPlaceIds.has(lead.placeId)) {
+          seenPlaceIds.add(lead.placeId);
+          if (!selectedSet || selectedSet.has(lead.placeId)) {
+            allLeads.push(lead);
+          }
+        }
+      }
+    }
 
-    toImport = toImport.slice(0, count);
+    const toImport = allLeads.slice(0, count);
 
     if (toImport.length === 0) {
       return NextResponse.json({ imported: 0, duplicates: 0, total: 0 });
