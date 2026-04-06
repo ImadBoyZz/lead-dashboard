@@ -155,6 +155,7 @@ export default async function WarmLeadsPage({ searchParams }: PageProps) {
                       <td className="px-4 py-3">
                         <StatusSwitcher
                           leadId={row.business.id}
+                          leadName={row.business.name}
                           currentStatus={row.status?.status}
                         />
                       </td>

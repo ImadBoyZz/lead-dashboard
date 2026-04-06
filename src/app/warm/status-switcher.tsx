@@ -5,16 +5,19 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LEAD_STATUS_OPTIONS } from "@/lib/constants";
+import { ContactMethodModal } from "@/components/pipeline/contact-method-modal";
 
 interface StatusSwitcherProps {
   leadId: string;
+  leadName?: string;
   currentStatus: string | undefined;
 }
 
-export function StatusSwitcher({ leadId, currentStatus }: StatusSwitcherProps) {
+export function StatusSwitcher({ leadId, leadName, currentStatus }: StatusSwitcherProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showChannelModal, setShowChannelModal] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const statusOpt = LEAD_STATUS_OPTIONS.find((s) => s.value === currentStatus);
@@ -37,6 +40,22 @@ export function StatusSwitcher({ leadId, currentStatus }: StatusSwitcherProps) {
       return;
     }
     setOpen(false);
+
+    // If "contacted", show channel modal first
+    if (newStatus === "contacted") {
+      setShowChannelModal(true);
+      return;
+    }
+
+    await applyStatus(newStatus);
+  }
+
+  async function handleChannelSelect(channel: string) {
+    setShowChannelModal(false);
+    await applyStatus("contacted", channel);
+  }
+
+  async function applyStatus(newStatus: string, channel?: string) {
     setLoading(true);
     try {
       await fetch(`/api/leads/${leadId}`, {
@@ -44,6 +63,18 @@ export function StatusSwitcher({ leadId, currentStatus }: StatusSwitcherProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
+
+      if (channel) {
+        await fetch(`/api/leads/${leadId}/outreach`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            channel,
+            outcome: "Gecontacteerd via " + channel,
+          }),
+        });
+      }
+
       router.refresh();
     } finally {
       setLoading(false);
@@ -55,37 +86,46 @@ export function StatusSwitcher({ leadId, currentStatus }: StatusSwitcherProps) {
   }
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="cursor-pointer transition-opacity hover:opacity-80"
-      >
-        {statusOpt ? (
-          <span className={"inline-flex items-center rounded-full text-xs font-medium px-2.5 py-0.5 " + statusOpt.color}>
-            {statusOpt.label}
-          </span>
-        ) : (
-          <Badge>Nieuw</Badge>
-        )}
-      </button>
+    <>
+      <div ref={ref} className="relative">
+        <button
+          onClick={() => setOpen(!open)}
+          className="cursor-pointer transition-opacity hover:opacity-80"
+        >
+          {statusOpt ? (
+            <span className={"inline-flex items-center rounded-full text-xs font-medium px-2.5 py-0.5 " + statusOpt.color}>
+              {statusOpt.label}
+            </span>
+          ) : (
+            <Badge>Nieuw</Badge>
+          )}
+        </button>
 
-      {open && (
-        <div className="absolute z-50 mt-1 left-0 min-w-[160px] rounded-lg border border-card-border bg-white shadow-lg py-1">
-          {LEAD_STATUS_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => handleSelect(opt.value)}
-              className={
-                "flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-gray-50" +
-                (opt.value === (currentStatus ?? "new") ? " bg-gray-50 font-medium" : "")
-              }
-            >
-              <span className={"inline-block h-2 w-2 rounded-full " + opt.color.split(" ")[0]} />
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+        {open && (
+          <div className="absolute z-50 mt-1 left-0 min-w-[160px] rounded-lg border border-card-border bg-white shadow-lg py-1">
+            {LEAD_STATUS_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => handleSelect(opt.value)}
+                className={
+                  "flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-gray-50" +
+                  (opt.value === (currentStatus ?? "new") ? " bg-gray-50 font-medium" : "")
+                }
+              >
+                <span className={"inline-block h-2 w-2 rounded-full " + opt.color.split(" ")[0]} />
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <ContactMethodModal
+        open={showChannelModal}
+        leadName={leadName ?? "deze lead"}
+        onSelect={handleChannelSelect}
+        onCancel={() => setShowChannelModal(false)}
+      />
+    </>
   );
 }
