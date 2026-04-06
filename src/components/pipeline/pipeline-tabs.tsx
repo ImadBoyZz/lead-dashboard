@@ -43,8 +43,8 @@ export interface PipelineLeadRow {
 
 const TABS = [
   { value: "contacted", label: "Gecontacteerd" },
-  { value: "quote_sent", label: "Offerte verstuurd" },
   { value: "meeting", label: "Afspraken" },
+  { value: "quote_sent", label: "Offerte verstuurd" },
   { value: "won", label: "Gewonnen" },
   { value: "ignored", label: "Genegeerd" },
 ] as const;

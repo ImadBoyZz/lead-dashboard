@@ -1,8 +1,8 @@
 export const LEAD_STATUS_OPTIONS = [
   { value: 'new', label: 'Nieuw', color: 'bg-blue-100 text-blue-700' },
   { value: 'contacted', label: 'Gecontacteerd', color: 'bg-yellow-100 text-yellow-700' },
-  { value: 'quote_sent', label: 'Offerte verstuurd', color: 'bg-purple-100 text-purple-700' },
   { value: 'meeting', label: 'Afspraak', color: 'bg-indigo-100 text-indigo-700' },
+  { value: 'quote_sent', label: 'Offerte verstuurd', color: 'bg-purple-100 text-purple-700' },
   { value: 'won', label: 'Gewonnen', color: 'bg-green-100 text-green-700' },
   { value: 'ignored', label: 'Genegeerd', color: 'bg-gray-100 text-gray-700' },
 ] as const;
@@ -46,8 +46,8 @@ export const SORT_OPTIONS = [
 export const PIPELINE_STAGE_OPTIONS = [
   { value: 'new', label: 'Nieuw', color: 'bg-blue-100 text-blue-700' },
   { value: 'contacted', label: 'Gecontacteerd', color: 'bg-yellow-100 text-yellow-700' },
-  { value: 'quote_sent', label: 'Offerte verstuurd', color: 'bg-purple-100 text-purple-700' },
   { value: 'meeting', label: 'Afspraak', color: 'bg-indigo-100 text-indigo-700' },
+  { value: 'quote_sent', label: 'Offerte verstuurd', color: 'bg-purple-100 text-purple-700' },
   { value: 'won', label: 'Gewonnen', color: 'bg-green-100 text-green-700' },
   { value: 'ignored', label: 'Genegeerd', color: 'bg-gray-100 text-gray-700' },
 ] as const;
