@@ -43,3 +43,9 @@ next-env.d.ts
 .vercel
 .env*.local
 kbo-data/
+
+# Privé/interne bestanden
+CLAUDE.md
+PLAN77.md
+IMPLEMENTATION-PLAN.md
+n8n/
