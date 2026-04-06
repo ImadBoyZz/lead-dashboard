@@ -56,7 +56,6 @@ Dit geeft je concrete argumenten in een verkoopgesprek: "Uw website scoort 35/10
 
 ### GDPR-compliant
 Het dashboard respecteert privacyregels:
-- Bedrijven kunnen een **opt-out** aanvragen (worden dan niet meer gecontacteerd)
 - Er is een **blacklist** voor bedrijven die je permanent wilt uitsluiten
 - Alle data komt van publieke bronnen (Google Maps)
 
