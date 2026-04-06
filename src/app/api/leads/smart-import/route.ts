@@ -140,93 +140,107 @@ export async function POST(request: NextRequest) {
       })
       .returning({ id: schema.importLogs.id });
 
-    let imported = 0;
-    let duplicates = 0;
+    // Batch insert businesses (1 query instead of N)
+    const businessValues = toImport.map((lead) => ({
+      registryId: lead.placeId,
+      country: 'BE' as const,
+      name: lead.name,
+      street: lead.address || null,
+      city: city,
+      sector: sector,
+      website: lead.website,
+      phone: lead.phone,
+      googlePlaceId: lead.placeId,
+      googleRating: lead.rating,
+      googleReviewCount: lead.reviewCount,
+      googleBusinessStatus: lead.businessStatus,
+      googlePhotosCount: lead.photosCount,
+      hasGoogleBusinessProfile: true,
+      googlePlacesEnrichedAt: new Date(),
+      chainWarning: lead.chainWarning,
+      dataSource: 'google_places' as const,
+    }));
 
-    for (const lead of toImport) {
-      const [result] = await db
-        .insert(schema.businesses)
-        .values({
-          registryId: lead.placeId,
-          country: 'BE',
-          name: lead.name,
-          street: lead.address || null,
-          city: city,
-          sector: sector,
-          website: lead.website,
-          phone: lead.phone,
-          googlePlaceId: lead.placeId,
-          googleRating: lead.rating,
-          googleReviewCount: lead.reviewCount,
-          googleBusinessStatus: lead.businessStatus,
-          googlePhotosCount: lead.photosCount,
-          hasGoogleBusinessProfile: true,
-          googlePlacesEnrichedAt: new Date(),
-          chainWarning: lead.chainWarning,
-          dataSource: 'google_places',
-        })
-        .onConflictDoNothing({
-          target: [schema.businesses.registryId, schema.businesses.country],
-        })
-        .returning({
-          id: schema.businesses.id,
+    const insertedBusinesses = await db
+      .insert(schema.businesses)
+      .values(businessValues)
+      .onConflictDoNothing({
+        target: [schema.businesses.registryId, schema.businesses.country],
+      })
+      .returning({
+        id: schema.businesses.id,
+        registryId: schema.businesses.registryId,
+      });
+
+    const imported = insertedBusinesses.length;
+    const duplicates = toImport.length - imported;
+
+    if (imported > 0) {
+      // Map inserted business IDs back to lead data for scoring
+      const idByPlaceId = new Map(
+        insertedBusinesses.map((b) => [b.registryId, b.id])
+      );
+
+      const statusValues: { businessId: string; status: 'new' }[] = [];
+      const scoreValues: {
+        businessId: string;
+        totalScore: number;
+        scoreBreakdown: Record<string, unknown>;
+        maturityCluster: string;
+        disqualified: boolean;
+        disqualifyReason: string | null;
+      }[] = [];
+      const pipelineValues: { businessId: string; stage: 'new' }[] = [];
+
+      for (const lead of toImport) {
+        const businessId = idByPlaceId.get(lead.placeId);
+        if (!businessId) continue; // was a duplicate
+
+        statusValues.push({ businessId, status: 'new' });
+
+        const scoreResult = computeScore({
+          business: {
+            website: lead.website,
+            foundedDate: null,
+            naceCode: null,
+            legalForm: null,
+            email: null,
+            phone: lead.phone,
+            googleRating: lead.rating,
+            googleReviewCount: lead.reviewCount,
+            googleBusinessStatus: lead.businessStatus,
+            googlePhotosCount: lead.photosCount,
+            hasGoogleBusinessProfile: true,
+            googlePlacesEnrichedAt: new Date(),
+            recentReviewCount: null,
+            reviewVelocity: null,
+            googlePhotosCountPrev: null,
+            googleBusinessUpdatedAt: null,
+            hasGoogleAds: null,
+            hasSocialMediaLinks: null,
+            optOut: false,
+          },
+          audit: null,
         });
 
-      // If onConflictDoNothing returned nothing, it's a duplicate
-      if (!result) {
-        duplicates++;
-        continue;
+        scoreValues.push({
+          businessId,
+          totalScore: scoreResult.totalScore,
+          scoreBreakdown: scoreResult.breakdown as Record<string, unknown>,
+          maturityCluster: scoreResult.maturityCluster,
+          disqualified: scoreResult.disqualified,
+          disqualifyReason: scoreResult.disqualifyReason,
+        });
+
+        pipelineValues.push({ businessId, stage: 'new' });
       }
 
-      imported++;
-
-      // Create lead status
-      await db.insert(schema.leadStatuses).values({
-        businessId: result.id,
-        status: 'new',
-      });
-
-      // Compute score with all available Google data
-      const scoreResult = computeScore({
-        business: {
-          website: lead.website,
-          foundedDate: null,
-          naceCode: null,
-          legalForm: null,
-          email: null,
-          phone: lead.phone,
-          googleRating: lead.rating,
-          googleReviewCount: lead.reviewCount,
-          googleBusinessStatus: lead.businessStatus,
-          googlePhotosCount: lead.photosCount,
-          hasGoogleBusinessProfile: true,
-          googlePlacesEnrichedAt: new Date(),
-          recentReviewCount: null,
-          reviewVelocity: null,
-          googlePhotosCountPrev: null,
-          googleBusinessUpdatedAt: null,
-          hasGoogleAds: null,
-          hasSocialMediaLinks: null,
-          optOut: false,
-        },
-        audit: null,
-      });
-
-      // Insert lead score
-      await db.insert(schema.leadScores).values({
-        businessId: result.id,
-        totalScore: scoreResult.totalScore,
-        scoreBreakdown: scoreResult.breakdown,
-        maturityCluster: scoreResult.maturityCluster,
-        disqualified: scoreResult.disqualified,
-        disqualifyReason: scoreResult.disqualifyReason,
-      });
-
-      // Create pipeline entry
-      await db.insert(schema.leadPipeline).values({
-        businessId: result.id,
-        stage: 'new',
-      });
+      // Batch insert child records (3 queries instead of 3N)
+      await Promise.all([
+        db.insert(schema.leadStatuses).values(statusValues),
+        db.insert(schema.leadScores).values(scoreValues),
+        db.insert(schema.leadPipeline).values(pipelineValues),
+      ]);
     }
 
     // Update import log

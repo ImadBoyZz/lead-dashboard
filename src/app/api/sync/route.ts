@@ -68,83 +68,87 @@ export async function POST(request: NextRequest) {
 
     importLogId = importLog.id;
 
-    let inserted = 0;
+    // Batch upsert all businesses (1 query instead of N)
+    const upsertValues = businesses.map((biz) => ({
+      registryId: biz.registryId,
+      country: biz.country,
+      name: biz.name,
+      legalForm: biz.legalForm,
+      naceCode: biz.naceCode,
+      naceDescription: biz.naceDescription,
+      foundedDate: biz.foundedDate,
+      street: biz.street,
+      houseNumber: biz.houseNumber,
+      postalCode: biz.postalCode,
+      city: biz.city,
+      province: biz.province,
+      website: biz.website,
+      email: biz.email,
+      phone: biz.phone,
+      googlePlaceId: biz.googlePlaceId,
+      googleRating: biz.googleRating,
+      googleReviewCount: biz.googleReviewCount,
+      dataSource: biz.dataSource,
+    }));
+
+    const results = await db
+      .insert(schema.businesses)
+      .values(upsertValues)
+      .onConflictDoUpdate({
+        target: [schema.businesses.registryId, schema.businesses.country],
+        set: {
+          name: sql`excluded.name`,
+          legalForm: sql`excluded.legal_form`,
+          naceCode: sql`excluded.nace_code`,
+          naceDescription: sql`excluded.nace_description`,
+          foundedDate: sql`excluded.founded_date`,
+          street: sql`excluded.street`,
+          houseNumber: sql`excluded.house_number`,
+          postalCode: sql`excluded.postal_code`,
+          city: sql`excluded.city`,
+          province: sql`excluded.province`,
+          website: sql`excluded.website`,
+          email: sql`excluded.email`,
+          phone: sql`excluded.phone`,
+          googlePlaceId: sql`excluded.google_place_id`,
+          googleRating: sql`excluded.google_rating`,
+          googleReviewCount: sql`excluded.google_review_count`,
+          dataSource: sql`excluded.data_source`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning({
+        id: schema.businesses.id,
+        createdAt: schema.businesses.createdAt,
+        updatedAt: schema.businesses.updatedAt,
+      });
+
+    // Determine which are new inserts vs updates
+    const newBusinessIds: string[] = [];
     let updated = 0;
 
-    for (const biz of businesses) {
-      const [result] = await db
-        .insert(schema.businesses)
-        .values({
-          registryId: biz.registryId,
-          country: biz.country,
-          name: biz.name,
-          legalForm: biz.legalForm,
-          naceCode: biz.naceCode,
-          naceDescription: biz.naceDescription,
-          foundedDate: biz.foundedDate,
-          street: biz.street,
-          houseNumber: biz.houseNumber,
-          postalCode: biz.postalCode,
-          city: biz.city,
-          province: biz.province,
-          website: biz.website,
-          email: biz.email,
-          phone: biz.phone,
-          googlePlaceId: biz.googlePlaceId,
-          googleRating: biz.googleRating,
-          googleReviewCount: biz.googleReviewCount,
-          dataSource: biz.dataSource,
-        })
-        .onConflictDoUpdate({
-          target: [schema.businesses.registryId, schema.businesses.country],
-          set: {
-            name: biz.name,
-            legalForm: biz.legalForm,
-            naceCode: biz.naceCode,
-            naceDescription: biz.naceDescription,
-            foundedDate: biz.foundedDate,
-            street: biz.street,
-            houseNumber: biz.houseNumber,
-            postalCode: biz.postalCode,
-            city: biz.city,
-            province: biz.province,
-            website: biz.website,
-            email: biz.email,
-            phone: biz.phone,
-            googlePlaceId: biz.googlePlaceId,
-            googleRating: biz.googleRating,
-            googleReviewCount: biz.googleReviewCount,
-            dataSource: biz.dataSource,
-            updatedAt: new Date(),
-          },
-        })
-        .returning({
-          id: schema.businesses.id,
-          createdAt: schema.businesses.createdAt,
-          updatedAt: schema.businesses.updatedAt,
-        });
-
-      // If createdAt and updatedAt are very close, it's a new insert
+    for (const result of results) {
       const isNew =
         Math.abs(result.createdAt.getTime() - result.updatedAt.getTime()) < 1000;
-
       if (isNew) {
-        inserted++;
-
-        // Create default leadStatuses row
-        await db.insert(schema.leadStatuses).values({
-          businessId: result.id,
-          status: 'new',
-        });
-
-        // Create default leadScores row
-        await db.insert(schema.leadScores).values({
-          businessId: result.id,
-          totalScore: 0,
-        });
+        newBusinessIds.push(result.id);
       } else {
         updated++;
       }
+    }
+
+    const inserted = newBusinessIds.length;
+
+    // Batch insert child records for new businesses only (2 queries instead of 2N)
+    if (newBusinessIds.length > 0) {
+      await Promise.all([
+        db.insert(schema.leadStatuses).values(
+          newBusinessIds.map((id) => ({ businessId: id, status: 'new' as const }))
+        ),
+        db.insert(schema.leadScores).values(
+          newBusinessIds.map((id) => ({ businessId: id, totalScore: 0 }))
+        ),
+      ]);
     }
 
     // Update import log to completed

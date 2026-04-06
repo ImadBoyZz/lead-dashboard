@@ -12,6 +12,8 @@ import { formatNumber } from "@/lib/utils";
 import { WarmLeadActions } from "./warm-lead-actions";
 import { WarmLeadFilters } from "./warm-lead-filters";
 import { StatusSwitcher } from "./status-switcher";
+import { Pagination } from "@/components/ui/pagination";
+import { ITEMS_PER_PAGE } from "@/lib/constants";
 
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -25,6 +27,9 @@ export default async function WarmLeadsPage({ searchParams }: PageProps) {
   const hasWebsite = (params.hasWebsite as string) || undefined;
   const province = (params.province as string) || undefined;
   const search = (params.search as string) || undefined;
+  const page = Math.max(1, parseInt((params.page as string) || "1", 10));
+  const limit = ITEMS_PER_PAGE;
+  const offset = (page - 1) * limit;
 
   const conditions = [
     eq(schema.businesses.optOut, false),
@@ -95,7 +100,9 @@ export default async function WarmLeadsPage({ searchParams }: PageProps) {
     .from(schema.businesses)
     .leftJoin(schema.leadStatuses, eq(schema.businesses.id, schema.leadStatuses.businessId))
     .where(whereClause)
-    .orderBy(desc(schema.businesses.updatedAt));
+    .orderBy(desc(schema.businesses.updatedAt))
+    .limit(limit)
+    .offset(offset);
 
   return (
     <div>
@@ -185,6 +192,16 @@ export default async function WarmLeadsPage({ searchParams }: PageProps) {
           </table>
         </div>
       </Card>
+
+      <Pagination
+        currentPage={page}
+        totalPages={Math.ceil(totalResult.count / limit)}
+        basePath="/warm"
+        searchParams={Object.fromEntries(
+          Object.entries({ sector, status, hasWebsite, province, search })
+            .filter(([, v]) => v !== undefined) as [string, string][]
+        )}
+      />
     </div>
   );
 }

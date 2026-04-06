@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { eq, desc, and, or, ne } from "drizzle-orm";
+import { eq, desc, and, or, ne, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { Header } from "@/components/layout/header";
@@ -37,27 +37,33 @@ export default async function PipelinePage() {
     )
     .orderBy(desc(schema.businesses.createdAt));
 
-  // Get last outreach per business for channel info
-  const outreachData = await db
-    .select({
-      businessId: schema.outreachLog.businessId,
-      channel: schema.outreachLog.channel,
-      contactedAt: schema.outreachLog.contactedAt,
-    })
-    .from(schema.outreachLog)
-    .orderBy(desc(schema.outreachLog.contactedAt));
-
-  // Build a map of latest outreach per business
+  // Get last outreach per business — only for businesses in the pipeline
+  const pipelineBusinessIds = data.map((row) => row.business.id);
   const latestOutreach = new Map<
     string,
     { channel: string; contactedAt: Date }
   >();
-  for (const o of outreachData) {
-    if (!latestOutreach.has(o.businessId)) {
-      latestOutreach.set(o.businessId, {
-        channel: o.channel,
-        contactedAt: o.contactedAt,
-      });
+
+  if (pipelineBusinessIds.length > 0) {
+    const outreachData = await db
+      .select({
+        businessId: schema.outreachLog.businessId,
+        channel: schema.outreachLog.channel,
+        contactedAt: schema.outreachLog.contactedAt,
+      })
+      .from(schema.outreachLog)
+      .where(
+        inArray(schema.outreachLog.businessId, pipelineBusinessIds)
+      )
+      .orderBy(desc(schema.outreachLog.contactedAt));
+
+    for (const o of outreachData) {
+      if (!latestOutreach.has(o.businessId)) {
+        latestOutreach.set(o.businessId, {
+          channel: o.channel,
+          contactedAt: o.contactedAt,
+        });
+      }
     }
   }
 

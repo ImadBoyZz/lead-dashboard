@@ -103,6 +103,9 @@ export const businesses = pgTable(
     index('businesses_postal_code_idx').on(table.postalCode),
     index('businesses_nace_code_idx').on(table.naceCode),
     index('businesses_opt_out_idx').on(table.optOut),
+    index('businesses_lead_temperature_idx').on(table.leadTemperature),
+    index('businesses_blacklisted_idx').on(table.blacklisted),
+    index('businesses_created_at_idx').on(table.createdAt),
   ],
 );
 
