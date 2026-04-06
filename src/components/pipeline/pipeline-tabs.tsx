@@ -399,10 +399,11 @@ function getColumnsForTab(tab: TabValue) {
           key: "meetingAt",
           header: "Afspraak",
           render: (item: PipelineLeadRow) => (
-            <span className="text-sm font-medium text-foreground flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-indigo-500" />
-              {formatDateTime(item.meetingAt)}
-            </span>
+            <InlineMeetingEditor
+              businessId={item.businessId}
+              pipelineId={item.pipelineId}
+              currentDate={item.meetingAt}
+            />
           ),
         },
         {
@@ -493,6 +494,88 @@ function getColumnsForTab(tab: TabValue) {
 // ── Sub-components ────────────────────────────────────
 
 import { PRIORITY_OPTIONS } from "@/lib/constants";
+import { Pencil, Check, Loader2 } from "lucide-react";
+
+function InlineMeetingEditor({
+  businessId,
+  pipelineId,
+  currentDate,
+}: {
+  businessId: string;
+  pipelineId: string;
+  currentDate: Date | string | null;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [date, setDate] = useState(() => {
+    if (!currentDate) return "";
+    const d = new Date(currentDate);
+    return d.toISOString().slice(0, 10);
+  });
+  const [time, setTime] = useState(() => {
+    if (!currentDate) return "10:00";
+    const d = new Date(currentDate);
+    return d.toTimeString().slice(0, 5);
+  });
+
+  async function handleSave() {
+    if (!date) return;
+    setSaving(true);
+    try {
+      const dateTime = new Date(`${date}T${time}:00`).toISOString();
+      await fetch(`/api/leads/${businessId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meetingAt: dateTime }),
+      });
+      setEditing(false);
+      window.location.reload();
+    } catch {
+      setSaving(false);
+    }
+  }
+
+  if (saving) {
+    return <Loader2 className="h-4 w-4 animate-spin text-muted" />;
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="rounded border border-input-border bg-white px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
+        />
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          className="rounded border border-input-border bg-white px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
+        />
+        <button
+          onClick={handleSave}
+          className="text-green-600 hover:text-green-700"
+          title="Opslaan"
+        >
+          <Check className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-accent transition-colors group"
+    >
+      <Calendar className="h-3.5 w-3.5 text-indigo-500" />
+      {currentDate ? formatDateTime(currentDate) : "Datum instellen"}
+      <Pencil className="h-3 w-3 text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
+  );
+}
 
 function PriorityBadge({ priority }: { priority: string }) {
   const config = PRIORITY_OPTIONS.find((p) => p.value === priority);

@@ -21,6 +21,7 @@ export async function updatePipelineStage(
   businessId: string,
   newStage: PipelineStage,
   oldStage?: string,
+  meetingAt?: Date,
 ) {
   // Update pipeline
   await db
@@ -42,7 +43,7 @@ export async function updatePipelineStage(
   if (newStage === 'contacted') {
     updateData.contactedAt = new Date();
   } else if (newStage === 'meeting') {
-    updateData.meetingAt = new Date();
+    updateData.meetingAt = meetingAt ?? new Date();
   } else if (newStage === 'won' || newStage === 'ignored') {
     updateData.closedAt = new Date();
   }

@@ -13,6 +13,7 @@ const pipelineUpdateSchema = z.object({
   nextFollowUpAt: z.string().optional(),
   followUpNote: z.string().max(1000).optional(),
   lostReason: z.string().max(500).optional(),
+  meetingAt: z.string().optional(),
 });
 
 interface RouteParams {
@@ -37,7 +38,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         .limit(1);
 
       if (current) {
-        await updatePipelineStage(current.businessId, parsed.data.stage, current.stage);
+        const meetingDate = parsed.data.meetingAt ? new Date(parsed.data.meetingAt) : undefined;
+        await updatePipelineStage(current.businessId, parsed.data.stage, current.stage, meetingDate);
       }
     }
 
@@ -49,6 +51,22 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (parsed.data.nextFollowUpAt !== undefined) updateData.nextFollowUpAt = parsed.data.nextFollowUpAt;
     if (parsed.data.followUpNote !== undefined) updateData.followUpNote = parsed.data.followUpNote;
     if (parsed.data.lostReason !== undefined) updateData.lostReason = parsed.data.lostReason;
+
+    // Sync meetingAt to leadStatuses if provided
+    if (parsed.data.meetingAt !== undefined) {
+      const [current] = await db
+        .select({ businessId: schema.leadPipeline.businessId })
+        .from(schema.leadPipeline)
+        .where(eq(schema.leadPipeline.id, id))
+        .limit(1);
+
+      if (current) {
+        await db
+          .update(schema.leadStatuses)
+          .set({ meetingAt: new Date(parsed.data.meetingAt) })
+          .where(eq(schema.leadStatuses.businessId, current.businessId));
+      }
+    }
 
     const [updated] = await db
       .update(schema.leadPipeline)

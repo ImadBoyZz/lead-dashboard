@@ -25,6 +25,7 @@ import { formatDate, getYearsInBusiness } from "@/lib/utils";
 import { getScoreColor, getScoreLabel } from "@/lib/scoring";
 import { LEAD_STATUS_OPTIONS } from "@/lib/constants";
 import { StatusChanger } from "./status-changer";
+import { MeetingEditor } from "./meeting-editor";
 import { AddNote } from "./add-note";
 import { DeleteNoteButton } from "@/components/notes/delete-note-button";
 import { CopyButton } from "./copy-button";
@@ -238,6 +239,15 @@ export default async function LeadDetailPage({ params }: PageProps) {
               </div>
 
               <StatusChanger leadId={id} currentStatus={currentStatus} />
+
+              {/* Afspraak datum/tijd */}
+              <div className="mt-4 pt-4 border-t border-card-border">
+                <h4 className="text-sm font-medium text-foreground mb-3">Afspraak</h4>
+                <MeetingEditor
+                  leadId={id}
+                  currentMeetingAt={status?.meetingAt?.toISOString() ?? null}
+                />
+              </div>
 
               {history.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-card-border">

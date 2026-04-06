@@ -81,11 +81,13 @@ const patchSchema = z.object({
     .enum([
       'new',
       'contacted',
+      'quote_sent',
       'meeting',
       'won',
       'ignored',
     ])
     .optional(),
+  meetingAt: z.string().optional(),
   note: z.string().optional(),
   optOut: z.boolean().optional(),
   leadTemperature: z.enum(['cold', 'warm']).optional(),
@@ -108,7 +110,7 @@ export async function PATCH(
       );
     }
 
-    const { status, note, optOut, leadTemperature, blacklisted } = parsed.data;
+    const { status, meetingAt, note, optOut, leadTemperature, blacklisted } = parsed.data;
 
     // Verify business exists
     const [business] = await db
@@ -165,12 +167,20 @@ export async function PATCH(
         await db
           .update(schema.leadPipeline)
           .set({
-            stage: status as 'new' | 'contacted' | 'meeting' | 'won' | 'ignored',
+            stage: status as 'new' | 'contacted' | 'quote_sent' | 'meeting' | 'won' | 'ignored',
             stageChangedAt: new Date(),
             updatedAt: new Date(),
           })
           .where(eq(schema.leadPipeline.businessId, id));
       }
+    }
+
+    // Handle meetingAt update
+    if (meetingAt) {
+      await db
+        .update(schema.leadStatuses)
+        .set({ meetingAt: new Date(meetingAt) })
+        .where(eq(schema.leadStatuses.businessId, id));
     }
 
     // Handle note
