@@ -194,10 +194,10 @@ export async function PATCH(
     }
 
     // Handle meetingAt update
-    if (meetingAt) {
+    if (meetingAt !== undefined) {
       await db
         .update(schema.leadStatuses)
-        .set({ meetingAt: new Date(meetingAt) })
+        .set({ meetingAt: meetingAt ? new Date(meetingAt) : null })
         .where(eq(schema.leadStatuses.businessId, id));
     }
 

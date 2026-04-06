@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, Clock, Pencil, Check, X, Loader2 } from "lucide-react";
+import { Calendar, Clock, Pencil, Check, X, Loader2, Trash2 } from "lucide-react";
 
 interface MeetingEditorProps {
   leadId: string;
@@ -51,6 +51,22 @@ export function MeetingEditor({ leadId, currentMeetingAt }: MeetingEditorProps) 
       setTime("10:00");
     }
     setEditing(false);
+  }
+
+  async function handleDelete() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meetingAt: "" }),
+      });
+      if (res.ok) {
+        router.refresh();
+      }
+    } finally {
+      setSaving(false);
+    }
   }
 
   const formattedDate = currentMeetingAt
@@ -139,13 +155,25 @@ export function MeetingEditor({ leadId, currentMeetingAt }: MeetingEditorProps) 
           <span className="text-sm text-muted">Geen afspraak gepland</span>
         )}
       </div>
-      <button
-        onClick={() => setEditing(true)}
-        className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
-      >
-        <Pencil className="h-3 w-3" />
-        {formattedDate ? "Wijzigen" : "Plannen"}
-      </button>
+      <div className="flex items-center gap-3">
+        {formattedDate && (
+          <button
+            onClick={handleDelete}
+            disabled={saving}
+            className="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-600 transition-colors disabled:opacity-50"
+          >
+            <Trash2 className="h-3 w-3" />
+            Verwijderen
+          </button>
+        )}
+        <button
+          onClick={() => setEditing(true)}
+          className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
+        >
+          <Pencil className="h-3 w-3" />
+          {formattedDate ? "Wijzigen" : "Plannen"}
+        </button>
+      </div>
     </div>
   );
 }
