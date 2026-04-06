@@ -153,6 +153,24 @@ export async function PATCH(
         fromStatus,
         toStatus: status,
       });
+
+      // Sync pipeline stage
+      const [pipeline] = await db
+        .select({ id: schema.leadPipeline.id })
+        .from(schema.leadPipeline)
+        .where(eq(schema.leadPipeline.businessId, id))
+        .limit(1);
+
+      if (pipeline) {
+        await db
+          .update(schema.leadPipeline)
+          .set({
+            stage: status as 'new' | 'contacted' | 'meeting' | 'won' | 'ignored',
+            stageChangedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.leadPipeline.businessId, id));
+      }
     }
 
     // Handle note
