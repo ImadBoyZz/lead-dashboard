@@ -4,10 +4,10 @@ import { eq, desc, and, or, ne, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { Header } from "@/components/layout/header";
-import { UrgentBanner } from "@/components/pipeline/urgent-banner";
+
 import { PipelineDashboard } from "@/components/pipeline/pipeline-dashboard";
 import type { PipelineLeadRow } from "@/components/pipeline/pipeline-tabs";
-import { getUrgentLeadsToday } from "@/lib/pipeline-logic";
+
 
 export default async function PipelinePage() {
   // Fetch pipeline data with business + outreach info
@@ -96,18 +96,12 @@ export default async function PipelinePage() {
     };
   });
 
-  // Urgent leads
-  const urgentLeads = await getUrgentLeadsToday();
-
   return (
     <div>
       <Header
         title="Pipeline"
         description={`${data.length} leads in pipeline`}
       />
-
-      {/* Compact urgency strip */}
-      <UrgentBanner leads={urgentLeads} />
 
       {/* Stats + tabbed lists */}
       <PipelineDashboard leads={tabLeads} />
