@@ -13,10 +13,6 @@ import { Pagination } from "@/components/ui/pagination";
 import { SmartImportButton } from "@/components/leads/smart-import-button";
 import { LeadFilters } from "@/components/leads/lead-filters";
 import { LeadActions } from "@/components/leads/lead-actions";
-import { LeadsSelectionProvider } from "@/components/leads/leads-selection-provider";
-import { LeadCheckbox } from "@/components/leads/lead-checkbox";
-import { SelectAllCheckbox } from "@/components/leads/select-all-checkbox";
-import { BatchToolbar } from "@/components/ai/batch-toolbar";
 import { InsightsWidget } from "@/components/ai/insights-widget";
 import { formatNumber } from "@/lib/utils";
 import { ITEMS_PER_PAGE } from "@/lib/constants";
@@ -164,10 +160,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   const exportParams = new URLSearchParams(filterParams);
   const exportUrl = "/api/export?" + exportParams.toString();
 
-  const pageIds = data.map((row) => row.business.id);
-
   return (
-    <LeadsSelectionProvider>
     <div>
       <Header
         title="Cold Leads"
@@ -205,9 +198,6 @@ export default async function LeadsPage({ searchParams }: PageProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50/80 border-b border-card-border">
-                <th className="px-4 py-3 w-10">
-                  <SelectAllCheckbox pageIds={pageIds} />
-                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Naam</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Sector</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Locatie</th>
@@ -218,7 +208,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
             <tbody className="divide-y divide-card-border">
               {data.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-muted">
+                  <td colSpan={5} className="px-4 py-12 text-center text-muted">
                     Geen leads gevonden
                   </td>
                 </tr>
@@ -229,9 +219,6 @@ export default async function LeadsPage({ searchParams }: PageProps) {
                       key={row.business.id}
                       className={"transition-colors hover:bg-blue-50/40" + (i % 2 === 1 ? " bg-gray-50/40" : "")}
                     >
-                      <td className="px-4 py-3 w-10">
-                        <LeadCheckbox leadId={row.business.id} />
-                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <Link
@@ -293,9 +280,6 @@ export default async function LeadsPage({ searchParams }: PageProps) {
       />
 
       <InsightsWidget />
-
-      <BatchToolbar />
     </div>
-    </LeadsSelectionProvider>
   );
 }
