@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   '/api/audit',       // n8n webhook (eigen Bearer auth)
   '/api/reminders/due', // n8n webhook (eigen Bearer auth)
   '/api/agent',         // managed agent endpoints (eigen Bearer auth)
+  '/api/gmail/callback', // Google OAuth callback
 ];
 
 export function middleware(request: NextRequest) {

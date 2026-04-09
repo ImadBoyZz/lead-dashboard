@@ -242,7 +242,7 @@ export default async function LeadDetailPage({ params }: PageProps) {
           {/* Outreach */}
           <Card title="Outreach">
             <div className="space-y-6">
-              <OutreachForm businessId={id} />
+              <OutreachForm businessId={id} email={business.email} />
               <div className="pt-4 border-t border-card-border">
                 <h4 className="text-sm font-medium text-foreground mb-3">Geschiedenis</h4>
                 <OutreachTimeline businessId={id} />

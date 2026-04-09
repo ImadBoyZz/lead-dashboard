@@ -6,12 +6,14 @@ import { Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OUTREACH_CHANNEL_OPTIONS } from "@/lib/constants";
 import { GenerateButton } from "@/components/ai/generate-button";
+import { GmailSendButton } from "./gmail-send-button";
 
 interface OutreachFormProps {
   businessId: string;
+  email?: string | null;
 }
 
-export function OutreachForm({ businessId }: OutreachFormProps) {
+export function OutreachForm({ businessId, email }: OutreachFormProps) {
   const router = useRouter();
   const [channel, setChannel] = useState("email");
   const [subject, setSubject] = useState("");
@@ -104,14 +106,32 @@ export function OutreachForm({ businessId }: OutreachFormProps) {
         />
       </div>
 
-      <Button variant="primary" size="sm" disabled={loading || !channel}>
-        {loading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Send className="h-4 w-4" />
+      <div className="flex items-center gap-3">
+        <Button variant="primary" size="sm" disabled={loading || !channel}>
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+          {loading ? "Opslaan..." : "Log outreach"}
+        </Button>
+
+        {channel === "email" && email && (
+          <GmailSendButton
+            businessId={businessId}
+            to={email}
+            subject={subject}
+            body={content}
+            onSent={() => {
+              setSubject("");
+              setContent("");
+              setAiGenerated(false);
+              router.refresh();
+            }}
+            disabled={!subject || !content}
+          />
         )}
-        {loading ? "Opslaan..." : "Log outreach"}
-      </Button>
+      </div>
     </form>
   );
 }
