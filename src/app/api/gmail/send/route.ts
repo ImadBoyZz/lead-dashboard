@@ -16,7 +16,7 @@ const sendSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  if (!isValidSession(request)) {
+  if (!(await isValidSession(request))) {
     return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 });
   }
 
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const { businessId, to, subject, body: emailBody, draftId } = parsed.data;
 
     // Verstuur via Gmail API
-    const { messageId } = await sendGmail({ to, subject, body: emailBody });
+    const { messageId, threadId } = await sendGmail({ to, subject, body: emailBody });
 
     // Log in outreach_log
     await db.insert(schema.outreachLog).values({
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       outcome: 'verstuurd via Gmail',
       aiGenerated: !!draftId,
       draftId: draftId ?? null,
+      gmailThreadId: threadId,
     });
 
     // Update pipeline
@@ -69,7 +70,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, messageId });
   } catch (error) {
     console.error('Gmail send error:', error);
-    const message = error instanceof Error ? error.message : 'Interne serverfout';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: 'E-mail versturen mislukt' }, { status: 500 });
   }
 }
