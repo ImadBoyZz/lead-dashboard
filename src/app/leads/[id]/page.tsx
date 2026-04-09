@@ -31,6 +31,8 @@ import { CopyButton } from "./copy-button";
 import { ScanButton } from "./scan-button";
 import { DetailLeadActions } from "./detail-lead-actions";
 import { BackButton } from "./back-button";
+import { OutreachForm } from "@/components/outreach/outreach-form";
+import { OutreachTimeline } from "@/components/outreach/outreach-timeline";
 import type { ScoreBreakdown } from "@/types";
 
 interface PageProps {
@@ -235,6 +237,17 @@ export default async function LeadDetailPage({ params }: PageProps) {
           {/* Lead Acties */}
           <Card title="Lead Acties">
             <DetailLeadActions leadId={id} temperature={business.leadTemperature} />
+          </Card>
+
+          {/* Outreach */}
+          <Card title="Outreach">
+            <div className="space-y-6">
+              <OutreachForm businessId={id} />
+              <div className="pt-4 border-t border-card-border">
+                <h4 className="text-sm font-medium text-foreground mb-3">Geschiedenis</h4>
+                <OutreachTimeline businessId={id} />
+              </div>
+            </div>
           </Card>
 
           {/* Notities */}
