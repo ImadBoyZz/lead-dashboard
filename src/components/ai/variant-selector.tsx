@@ -21,7 +21,7 @@ export function VariantSelector({ variants, onSelect, onClose }: VariantSelector
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl mx-4 max-h-[80vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-card-border">
           <h3 className="text-lg font-semibold">Kies een variant</h3>
@@ -56,12 +56,12 @@ export function VariantSelector({ variants, onSelect, onClose }: VariantSelector
               </div>
 
               {variant.subject && (
-                <p className="font-medium text-sm mb-2 line-clamp-2">
+                <p className="font-medium text-sm mb-2">
                   {variant.subject}
                 </p>
               )}
 
-              <p className="text-sm text-muted line-clamp-6 whitespace-pre-wrap">
+              <p className="text-sm text-muted whitespace-pre-wrap">
                 {variant.body}
               </p>
 
