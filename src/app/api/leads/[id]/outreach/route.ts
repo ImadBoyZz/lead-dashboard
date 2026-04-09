@@ -14,6 +14,7 @@ const outreachSchema = z.object({
   structuredOutcome: z.enum(['no_answer', 'voicemail', 'callback_requested', 'interested', 'not_interested', 'meeting_booked', 'wrong_contact', 'other']).optional(),
   durationMinutes: z.number().int().min(0).max(480).optional(),
   nextAction: z.string().max(500).optional(),
+  aiGenerated: z.boolean().optional(),
 });
 
 interface RouteParams {
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         structuredOutcome: parsed.data.structuredOutcome ?? null,
         durationMinutes: parsed.data.durationMinutes,
         nextAction: parsed.data.nextAction,
+        aiGenerated: parsed.data.aiGenerated ?? false,
       })
       .returning();
 
@@ -73,6 +75,33 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Create auto reminder
     await createAutoReminder(id, parsed.data.channel, parsed.data.outcome);
+
+    // Scoring feedback snapshot
+    if (parsed.data.structuredOutcome) {
+      try {
+        const score = await db.query.leadScores.findFirst({ where: eq(schema.leadScores.businessId, id) });
+        const business = await db.query.businesses.findFirst({ where: eq(schema.businesses.id, id) });
+        const pipeline = await db.query.leadPipeline.findFirst({ where: eq(schema.leadPipeline.businessId, id) });
+
+        if (business) {
+          await db.insert(schema.scoringFeedback).values({
+            businessId: id,
+            channel: parsed.data.channel,
+            outcome: parsed.data.structuredOutcome,
+            naceCode: business.naceCode ?? null,
+            sector: business.sector ?? null,
+            maturityCluster: score?.maturityCluster ?? null,
+            totalScore: score?.totalScore ?? 0,
+            scoreBreakdown: score?.scoreBreakdown ?? {},
+            outreachCount: pipeline?.outreachCount ?? 0,
+            leadTemperature: business.leadTemperature,
+            conversionSuccess: ['interested', 'meeting_booked', 'callback_requested'].includes(parsed.data.structuredOutcome),
+          });
+        }
+      } catch (feedbackErr) {
+        console.error('Scoring feedback error:', feedbackErr);
+      }
+    }
 
     return NextResponse.json(log, { status: 201 });
   } catch (error) {

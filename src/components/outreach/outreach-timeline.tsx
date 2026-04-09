@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Mail, Phone, ExternalLink, MessageCircle, Users, Clock } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { FollowUpCard } from "@/components/ai/follow-up-card";
 
 interface OutreachEntry {
   id: string;
@@ -11,6 +12,7 @@ interface OutreachEntry {
   content: string | null;
   outcome: string | null;
   contactedAt: string;
+  structuredOutcome: string | null;
   durationMinutes: number | null;
   nextAction: string | null;
 }
@@ -85,6 +87,9 @@ export function OutreachTimeline({ businessId }: OutreachTimelineProps) {
                 <p className="text-xs mt-0.5">
                   <span className="text-muted">Volgende stap:</span> {entry.nextAction}
                 </p>
+              )}
+              {(entry.outcome || entry.structuredOutcome) && (
+                <FollowUpCard outreachLogId={entry.id} businessId={businessId} />
               )}
             </div>
           </div>

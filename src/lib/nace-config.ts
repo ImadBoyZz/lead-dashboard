@@ -6,60 +6,57 @@ export type SectorTier = 'A' | 'B' | 'C' | 'D';
 
 export const SECTOR_TIERS: Record<SectorTier, { name: string; score: number; prefixes: readonly string[] }> = {
   A: {
-    name: 'Zichtbaarheidssectoren',
+    name: 'Kernfocus',
     score: 27,
     prefixes: [
-      '56',    // Horeca (restaurants, cafes, catering, traiteurs)
-      '9602',  // Kappers, schoonheidssalons
-      '9604',  // Wellness, sauna
-      '47',    // Detailhandel (bakkerijen, slagers, apotheken, optiek, juweliers)
-      '45',    // Autohandel, garages
-      '862',   // Huisartsen, tandartsen, specialisten
-      '869',   // Kinesitherapie, paramedisch
-      '931',   // Fitness, sportclubs
+      '43',    // Gespecialiseerde bouw (installateurs, HVAC, elektra, dakwerk, loodgieters, schilderwerk)
+      '68',    // Vastgoed (makelaars, beheer)
+      '862',   // Tandartsen, specialisten
+      '41',    // Algemene bouw, aannemers
     ],
   },
   B: {
-    name: 'Lokale diensten',
+    name: 'Secundaire sectoren',
     score: 15,
     prefixes: [
-      '41',    // Algemene bouw
-      '42',    // Weg- en waterbouw
-      '43',    // Gespecialiseerde bouw (HVAC, elektra, dakwerk, schilderwerk)
+      '45',    // Autohandel, garages
       '8130',  // Tuinaanleg
-      '68',    // Vastgoed (makelaars, beheer)
-      '8230',  // Evenementen, trouwplanners
-      '55',    // Hotels, B&Bs, vakantiewoningen
-      '75',    // Dierenartsen
+      '692',   // Accountants, boekhouders
+      '6920',  // Accountants (specifiek)
+      '42',    // Weg- en waterbouw
     ],
   },
   C: {
-    name: 'Professionele diensten',
-    score: 13,
+    name: 'Lage prioriteit',
+    score: 5,
     prefixes: [
-      '691',   // Advocaten, notarissen
-      '692',   // Accountants, boekhouders
-      '6920',  // Accountants (specifiek)
+      '56',    // Horeca — gedemoveerd: lage marges, hoog faillissementsrisico
+      '9602',  // Kappers, schoonheidssalons — gratis tools domineren (Treatwell/Fresha)
+      '9604',  // Wellness, sauna
+      '47',    // Detailhandel
+      '869',   // Kinesitherapie — te kleine ticket per patiënt
+      '931',   // Fitness — ketens domineren
+      '691',   // Advocaten, notarissen — extreem conservatief
       '711',   // Architecten, ingenieurs
       '7420',  // Fotografen
       '7410',  // Interieurontwerp
-      '8510',  // Kinderopvang (kleuterschool)
-      '8520',  // Kinderopvang (basisonderwijs)
-      '8891',  // Kinderopvang (kinderdagverblijf)
+      '75',    // Dierenartsen
+      '8230',  // Evenementen
+      '55',    // Hotels, B&Bs
     ],
   },
   D: {
     name: 'B2B/overig',
-    score: 5,
+    score: 2,
     prefixes: [
-      '49',    // Transport — NOTE: 49 is also in blacklist for spoor/bus,
-               //   but D-tier transport entries should use more specific prefixes
-               //   if needed. Keeping for generic transport matching.
       '46',    // Groothandel
       '10',    // Voedingsproductie
       '25',    // Metaalproductie
       '310',   // Meubelmakers
       '9603',  // Begrafenisondernemingen
+      '8510',  // Kinderopvang
+      '8520',  // Kinderopvang
+      '8891',  // Kinderopvang
     ],
   },
 } as const;
@@ -91,12 +88,16 @@ export const LEGAL_FORM_EXCLUDE = ['027', '019'] as const;
 // ============================================================
 
 export const SECTOR_REVIEW_MEDIANS: Record<string, { median: number; prefixes: string[] }> = {
+  installateurs_bouw: { median: 12, prefixes: ['41', '42', '43'] },
+  vastgoed: { median: 10, prefixes: ['68'] },
+  tandartsen: { median: 8, prefixes: ['862'] },
+  garage_auto: { median: 20, prefixes: ['45'] },
+  accountants: { median: 6, prefixes: ['692', '6920'] },
+  tuinaanleg: { median: 10, prefixes: ['8130'] },
+  // Legacy clusters (voor bestaande data)
   horeca_food: { median: 45, prefixes: ['56'] },
   beauty_wellness: { median: 25, prefixes: ['9602', '9604', '931'] },
-  garage_auto: { median: 20, prefixes: ['45'] },
   retail: { median: 15, prefixes: ['47'] },
-  bouw_ambacht: { median: 12, prefixes: ['41', '42', '43'] },
-  juridisch_medisch: { median: 6, prefixes: ['691', '692', '862', '869'] },
 };
 
 const DEFAULT_MEDIAN_REVIEWS = 10;

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OUTREACH_CHANNEL_OPTIONS } from "@/lib/constants";
+import { GenerateButton } from "@/components/ai/generate-button";
 
 interface OutreachFormProps {
   businessId: string;
@@ -17,6 +18,7 @@ export function OutreachForm({ businessId }: OutreachFormProps) {
   const [content, setContent] = useState("");
   const [outcome, setOutcome] = useState("");
   const [loading, setLoading] = useState(false);
+  const [aiGenerated, setAiGenerated] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,12 +28,13 @@ export function OutreachForm({ businessId }: OutreachFormProps) {
       await fetch(`/api/leads/${businessId}/outreach`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channel, subject, content, outcome }),
+        body: JSON.stringify({ channel, subject, content, outcome, aiGenerated }),
       });
 
       setSubject("");
       setContent("");
       setOutcome("");
+      setAiGenerated(false);
       router.refresh();
     } catch {
       // silently fail
@@ -44,17 +47,28 @@ export function OutreachForm({ businessId }: OutreachFormProps) {
     <form onSubmit={handleSubmit} className="space-y-3">
       <div>
         <label className="block text-xs font-medium text-muted mb-1">Kanaal</label>
-        <select
-          value={channel}
-          onChange={(e) => setChannel(e.target.value)}
-          className="w-full rounded-lg border border-card-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
-        >
-          {OUTREACH_CHANNEL_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        <div className="flex gap-2 items-end">
+          <select
+            value={channel}
+            onChange={(e) => setChannel(e.target.value)}
+            className="flex-1 rounded-lg border border-card-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+          >
+            {OUTREACH_CHANNEL_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <GenerateButton
+            businessId={businessId}
+            channel={channel}
+            onSelect={(variant) => {
+              if (variant.subject) setSubject(variant.subject);
+              setContent(variant.body);
+              setAiGenerated(true);
+            }}
+          />
+        </div>
       </div>
 
       <div>

@@ -23,15 +23,20 @@ export const DUTCH_PROVINCES = [
   'Utrecht', 'Zeeland', 'Zuid-Holland',
 ] as const;
 
-// Common NACE codes for target sectors
+// Target NACE codes — afgestemd op kernfocus sectoren
 export const TARGET_NACE_CODES = {
-  'Horeca': ['5610', '5621', '5629', '5630', '5510', '5520'],
-  'Retail': ['4711', '4719', '4721', '4751', '4759', '4771', '4772'],
-  'Bouw': ['4110', '4120', '4211', '4221', '4291', '4311', '4321', '4322', '4329', '4331', '4332', '4333', '4334', '4339', '4391', '4399'],
+  // Tier 1: Kernfocus
+  'Installateurs': ['4321', '4322', '4329'],  // Elektra, sanitair/HVAC, overige installatie
   'Vastgoed': ['6810', '6820', '6831', '6832'],
+  'Tandartsen': ['8621', '8623'],
+  'Dakwerken': ['4391'],
+  'Bouw': ['4110', '4120', '4211', '4311', '4331', '4332', '4333', '4334', '4339', '4399'],
+  // Tier 2: Secundair
   'Auto': ['4511', '4519', '4520', '4531', '4532', '4540'],
-  'Vrije beroepen': ['6910', '6920', '7010', '7021', '7022', '7111', '7112', '7120', '8621', '8622', '8623', '8690'],
-  'IT/Tech': ['6201', '6202', '6203', '6209', '6311', '6312'],
+  'Tuinaanleg': ['8130'],
+  'Accountants': ['6920'],
+  'Schilderwerk': ['4334'],
+  'Ramen & Deuren': ['4332'],
 } as const;
 
 export const ITEMS_PER_PAGE = 25;

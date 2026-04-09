@@ -3,7 +3,8 @@
 //
 // Vereist: ANTHROPIC_API_KEY in .env.local of als env var
 
-import 'dotenv/config';
+import { config } from 'dotenv';
+config({ path: '.env.local' });
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 if (!ANTHROPIC_API_KEY) {
