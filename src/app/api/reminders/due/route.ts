@@ -1,12 +1,20 @@
+import { timingSafeEqual } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { and, eq, lte } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
+import { env } from '@/lib/env';
 
 function authenticateN8n(request: Request): boolean {
   const auth = request.headers.get('authorization');
   if (!auth || !auth.startsWith('Bearer ')) return false;
-  return auth.slice(7) === process.env.N8N_WEBHOOK_SECRET;
+  const token = auth.slice(7);
+  const secret = env.N8N_WEBHOOK_SECRET;
+  if (!token || !secret) return false;
+  const tokenBuf = Buffer.from(token);
+  const secretBuf = Buffer.from(secret);
+  if (tokenBuf.length !== secretBuf.length) return false;
+  return timingSafeEqual(tokenBuf, secretBuf);
 }
 
 export async function GET(request: NextRequest) {

@@ -10,8 +10,11 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    await db.delete(schema.notes).where(eq(schema.notes.id, id));
+    const [deleted] = await db.delete(schema.notes).where(eq(schema.notes.id, id)).returning({ id: schema.notes.id });
 
+    if (!deleted) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Delete note error:', error);

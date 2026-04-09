@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, Send, CheckCheck, XCircle } from "lucide-react";
+import { Loader2, Send, CheckCheck, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { DraftCard } from "./draft-card";
@@ -90,8 +90,17 @@ export function DraftApprovalBoard({ campaignId }: DraftApprovalBoardProps) {
     }
   }
 
+  const [currentIndex, setCurrentIndex] = useState(0);
   const approvedCount = drafts.filter((d) => d.status === "approved").length;
   const pendingCount = drafts.filter((d) => d.status === "pending").length;
+  const currentDraft = drafts[currentIndex];
+
+  function goNext() {
+    if (currentIndex < drafts.length - 1) setCurrentIndex(currentIndex + 1);
+  }
+  function goPrev() {
+    if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+  }
 
   if (loading) {
     return (
@@ -129,15 +138,36 @@ export function DraftApprovalBoard({ campaignId }: DraftApprovalBoardProps) {
         )}
       </div>
 
-      {/* Draft grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {drafts.map((draft) => (
-          <DraftCard
-            key={draft.id}
-            draft={draft}
-            onStatusChange={handleStatusChange}
-          />
-        ))}
+      {/* Single draft view met navigatie */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={goPrev}
+          disabled={currentIndex === 0}
+          className="shrink-0 p-3 rounded-full bg-white border-2 border-card-border hover:border-accent hover:bg-accent/5 disabled:opacity-20 disabled:cursor-not-allowed transition-colors shadow-sm"
+        >
+          <ChevronLeft className="h-7 w-7" />
+        </button>
+
+        <div className="flex-1 max-w-2xl mx-auto">
+          <div className="text-center text-sm text-muted mb-3">
+            {currentIndex + 1} van {drafts.length}
+          </div>
+          {currentDraft && (
+            <DraftCard
+              key={currentDraft.id}
+              draft={currentDraft}
+              onStatusChange={handleStatusChange}
+            />
+          )}
+        </div>
+
+        <button
+          onClick={goNext}
+          disabled={currentIndex === drafts.length - 1}
+          className="shrink-0 p-3 rounded-full bg-white border-2 border-card-border hover:border-accent hover:bg-accent/5 disabled:opacity-20 disabled:cursor-not-allowed transition-colors shadow-sm"
+        >
+          <ChevronRight className="h-7 w-7" />
+        </button>
       </div>
     </div>
   );

@@ -39,6 +39,7 @@ export default function LoginPage() {
           <input
             type="password"
             placeholder="Wachtwoord"
+            aria-label="Wachtwoord"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full px-3 py-2 border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent"

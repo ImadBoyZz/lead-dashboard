@@ -20,7 +20,7 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   await params; // consume params
 
-  if (!isValidSession(request)) {
+  if (!(await isValidSession(request))) {
     return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 });
   }
 

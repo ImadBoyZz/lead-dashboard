@@ -1,7 +1,7 @@
 "use client";
 
 import { Mail, Phone, ExternalLink, MessageCircle, Users, X } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 
 interface ContactMethodModalProps {
   open: boolean;
@@ -26,6 +26,15 @@ export function ContactMethodModal({
 }: ContactMethodModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onCancel]);
+
   if (!open) return null;
 
   function handleOverlayClick(e: React.MouseEvent) {
@@ -36,6 +45,9 @@ export function ContactMethodModal({
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Contactmethode kiezen"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
     >
       <div className="w-full max-w-xs bg-white rounded-xl shadow-xl border border-card-border p-5 mx-4">

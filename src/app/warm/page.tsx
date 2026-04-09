@@ -109,6 +109,8 @@ export default async function WarmLeadsPage({ searchParams }: PageProps) {
     .offset(offset);
 
   const pageIds = data.map((row) => row.business.id);
+  const idsWithEmail = data.filter((row) => !!row.business.email).map((row) => row.business.id);
+  const idsWithWebsite = data.filter((row) => !!row.business.website).map((row) => row.business.id);
 
   return (
     <LeadsSelectionProvider>
@@ -216,7 +218,7 @@ export default async function WarmLeadsPage({ searchParams }: PageProps) {
         )}
       />
 
-      <BatchToolbar />
+      <BatchToolbar idsWithEmail={idsWithEmail} idsWithWebsite={idsWithWebsite} />
     </div>
     </LeadsSelectionProvider>
   );

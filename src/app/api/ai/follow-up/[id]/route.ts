@@ -15,7 +15,7 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
 
-  if (!isValidSession(request)) {
+  if (!(await isValidSession(request))) {
     return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 });
   }
 
@@ -86,7 +86,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     };
 
     try {
-      suggestion = JSON.parse(response.text);
+      let text = response.text.trim();
+      if (text.startsWith('```')) {
+        text = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+      }
+      suggestion = JSON.parse(text);
     } catch {
       return NextResponse.json({
         error: 'AI antwoord kon niet verwerkt worden',

@@ -115,6 +115,7 @@ export const auditResults = pgTable('audit_results', {
   id: uuid('id').defaultRandom().primaryKey(),
   businessId: uuid('business_id')
     .notNull()
+    .unique()
     .references(() => businesses.id, { onDelete: 'cascade' }),
   hasWebsite: boolean('has_website'),
   websiteUrl: text('website_url'),
@@ -148,7 +149,9 @@ export const auditResults = pgTable('audit_results', {
   hasSocialMediaLinks: boolean('has_social_media_links'), // Facebook/Instagram/LinkedIn links op site
   auditedAt: timestamp('audited_at').defaultNow().notNull(),
   auditVersion: integer('audit_version').default(1).notNull(),
-});
+}, (table) => [
+  index('audit_results_business_idx').on(table.businessId),
+]);
 
 // ── Lead Scores ────────────────────────────────────────
 
@@ -198,7 +201,9 @@ export const notes = pgTable('notes', {
   content: text('content').notNull(),
   author: text('author').default('human').notNull(), // 'human' | 'agent'
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => [
+  index('notes_business_idx').on(table.businessId),
+]);
 
 // ── Status History ─────────────────────────────────────
 
@@ -210,7 +215,9 @@ export const statusHistory = pgTable('status_history', {
   fromStatus: text('from_status'),
   toStatus: text('to_status').notNull(),
   changedAt: timestamp('changed_at').defaultNow().notNull(),
-});
+}, (table) => [
+  index('status_history_business_idx').on(table.businessId),
+]);
 
 // ── Import Logs ────────────────────────────────────────
 
@@ -359,6 +366,7 @@ export const outreachLog = pgTable('outreach_log', {
   nextAction: text('next_action'),
   aiGenerated: boolean('ai_generated').default(false),
   draftId: uuid('draft_id'),
+  gmailThreadId: text('gmail_thread_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
   index('outreach_log_business_idx').on(table.businessId),

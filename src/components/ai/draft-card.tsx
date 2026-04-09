@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, X, Loader2 } from "lucide-react";
+import { Check, X, Loader2, RefreshCw } from "lucide-react";
 
 interface Draft {
   id: string;
@@ -96,8 +96,8 @@ export function DraftCard({ draft, onStatusChange }: DraftCardProps) {
         value={body}
         onChange={(e) => setBody(e.target.value)}
         onBlur={() => { if (body !== draft.body) updateDraft({ body }); }}
-        rows={5}
-        className="w-full text-sm bg-transparent border rounded-lg border-card-border/50 p-2 resize-none focus:outline-none focus:border-accent"
+        rows={14}
+        className="w-full text-sm bg-transparent border rounded-lg border-card-border/50 p-3 focus:outline-none focus:border-accent"
         disabled={draft.status === "rejected" || draft.status === "sent"}
       />
 
@@ -119,6 +119,33 @@ export function DraftCard({ draft, onStatusChange }: DraftCardProps) {
           >
             <X className="h-3 w-3" />
             Afwijzen
+          </button>
+          <button
+            onClick={async () => {
+              setSaving(true);
+              try {
+                const res = await fetch("/api/ai/generate", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ businessId: draft.businessId, channel: draft.channel }),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  const v = data.variants?.[0];
+                  if (v) {
+                    setSubject(v.subject ?? "");
+                    setBody(v.body);
+                  }
+                }
+              } finally {
+                setSaving(false);
+              }
+            }}
+            disabled={saving}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50 ml-auto"
+          >
+            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            Genereer nieuw
           </button>
         </div>
       )}

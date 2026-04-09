@@ -64,7 +64,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
   try {
-    await db.delete(schema.outreachTemplates).where(eq(schema.outreachTemplates.id, id));
+    const [deleted] = await db.delete(schema.outreachTemplates).where(eq(schema.outreachTemplates.id, id)).returning({ id: schema.outreachTemplates.id });
+    if (!deleted) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Delete template error:', error);

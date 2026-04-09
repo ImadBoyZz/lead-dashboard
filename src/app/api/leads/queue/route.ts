@@ -26,6 +26,7 @@ const CLOSED_STAGES = ['won', 'ignored'] as const;
  * Returns actieve wachtrij status + leads.
  */
 export async function GET() {
+  try {
   const capacity = await hasQueueCapacity();
 
   const activeLeads = await db
@@ -62,6 +63,10 @@ export async function GET() {
     active: activeLeads,
     frozen: frozenLeads,
   });
+  } catch (error) {
+    console.error('Queue GET error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }
 
 /**
@@ -69,38 +74,43 @@ export async function GET() {
  * Actions: freeze, unfreeze, markLost, markWon
  */
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const parsed = queueActionSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
-  }
-  const { action, businessId } = parsed.data;
-
-  switch (action) {
-    case 'freeze':
-      await freezeLead(businessId);
-      return NextResponse.json({ success: true, action: 'frozen' });
-
-    case 'unfreeze': {
-      const ok = await unfreezeLead(businessId);
-      if (!ok) {
-        const capacity = await hasQueueCapacity();
-        return NextResponse.json({
-          error: `Wachtrij vol (${capacity.activeCount}/${capacity.max})`,
-        }, { status: 409 });
-      }
-      return NextResponse.json({ success: true, action: 'unfrozen' });
+  try {
+    const body = await request.json();
+    const parsed = queueActionSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
     }
+    const { action, businessId } = parsed.data;
 
-    case 'markIgnored':
-      await markAsIgnored(businessId, parsed.data.rejectionReason ?? 'other', parsed.data.lostReason);
-      return NextResponse.json({ success: true, action: 'ignored' });
+    switch (action) {
+      case 'freeze':
+        await freezeLead(businessId);
+        return NextResponse.json({ success: true, action: 'frozen' });
 
-    case 'markWon':
-      await markAsWon(businessId, parsed.data.wonValue ?? 0);
-      return NextResponse.json({ success: true, action: 'won' });
+      case 'unfreeze': {
+        const ok = await unfreezeLead(businessId);
+        if (!ok) {
+          const capacity = await hasQueueCapacity();
+          return NextResponse.json({
+            error: `Wachtrij vol (${capacity.activeCount}/${capacity.max})`,
+          }, { status: 409 });
+        }
+        return NextResponse.json({ success: true, action: 'unfrozen' });
+      }
 
-    default:
-      return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+      case 'markIgnored':
+        await markAsIgnored(businessId, parsed.data.rejectionReason ?? 'other', parsed.data.lostReason);
+        return NextResponse.json({ success: true, action: 'ignored' });
+
+      case 'markWon':
+        await markAsWon(businessId, parsed.data.wonValue ?? 0);
+        return NextResponse.json({ success: true, action: 'won' });
+
+      default:
+        return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+    }
+  } catch (error) {
+    console.error('Queue POST error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

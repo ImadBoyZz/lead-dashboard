@@ -34,7 +34,7 @@ export function VariantSelector({ variants, onSelect, onClose }: VariantSelector
         </div>
 
         {/* Variants grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
           {variants.map((variant) => (
             <button
               key={variant.variantIndex}
@@ -66,7 +66,7 @@ export function VariantSelector({ variants, onSelect, onClose }: VariantSelector
               </p>
 
               <span className="inline-block mt-3 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-muted">
-                {variant.tone === "formal" ? "Formeel" : variant.tone === "informal" ? "Informeel" : "Semi-formeel"}
+                {variant.tone === "formal" ? "Formeel" : "Semi-formeel"}
               </span>
             </button>
           ))}

@@ -18,7 +18,7 @@ const batchSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  if (!isValidSession(request)) {
+  if (!(await isValidSession(request))) {
     return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 });
   }
 
@@ -65,6 +65,8 @@ export async function POST(request: NextRequest) {
         stad: business.city,
         naceDescription: business.naceDescription,
         website: business.website,
+        googleRating: business.googleRating,
+        googleReviewCount: business.googleReviewCount,
         auditFindings: {
           pagespeedMobile: audit?.pagespeedMobileScore ?? null,
           pagespeedDesktop: audit?.pagespeedDesktopScore ?? null,
@@ -88,9 +90,18 @@ export async function POST(request: NextRequest) {
         let variants: { subject?: string; body: string }[];
 
         try {
-          variants = JSON.parse(response.text);
-          if (!Array.isArray(variants)) continue;
-        } catch {
+          // Strip markdown code blocks als de AI die toevoegt
+          let text = response.text.trim();
+          if (text.startsWith('```')) {
+            text = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+          }
+          variants = JSON.parse(text);
+          if (!Array.isArray(variants)) {
+            console.error(`Batch: ongeldig AI formaat voor ${business.name}:`, response.text.slice(0, 200));
+            continue;
+          }
+        } catch (parseErr) {
+          console.error(`Batch: JSON parse error voor ${business.name}:`, response.text.slice(0, 200));
           continue;
         }
 

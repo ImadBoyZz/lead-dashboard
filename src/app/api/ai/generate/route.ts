@@ -17,7 +17,7 @@ const generateSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  if (!isValidSession(request)) {
+  if (!(await isValidSession(request))) {
     return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 });
   }
 
@@ -68,6 +68,8 @@ export async function POST(request: NextRequest) {
       stad: business.city,
       naceDescription: business.naceDescription,
       website: business.website,
+      googleRating: business.googleRating,
+      googleReviewCount: business.googleReviewCount,
       auditFindings: {
         pagespeedMobile: audit?.pagespeedMobileScore ?? null,
         pagespeedDesktop: audit?.pagespeedDesktopScore ?? null,
@@ -95,7 +97,11 @@ export async function POST(request: NextRequest) {
     // Parse response
     let variants: { subject?: string; body: string }[];
     try {
-      variants = JSON.parse(response.text);
+      let text = response.text.trim();
+      if (text.startsWith('```')) {
+        text = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+      }
+      variants = JSON.parse(text);
       if (!Array.isArray(variants) || variants.length === 0) {
         throw new Error('Ongeldig AI antwoord');
       }
@@ -117,10 +123,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
-      variants: variants.slice(0, 3).map((v, i) => ({
+      variants: variants.slice(0, 2).map((v, i) => ({
         subject: v.subject ?? null,
         body: v.body,
-        tone: toon,
+        tone: i === 0 ? 'semi-formal' : 'formal',
         variantIndex: i,
       })),
       usage: response.usage,

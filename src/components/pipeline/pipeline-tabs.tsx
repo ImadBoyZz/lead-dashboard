@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Mail,
@@ -504,6 +505,7 @@ function InlineMeetingEditor({
   pipelineId: string;
   currentDate: Date | string | null;
 }) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [date, setDate] = useState(() => {
@@ -528,7 +530,7 @@ function InlineMeetingEditor({
         body: JSON.stringify({ meetingAt: dateTime }),
       });
       setEditing(false);
-      window.location.reload();
+      router.refresh();
     } catch {
       setSaving(false);
     }
@@ -577,6 +579,7 @@ function InlineMeetingEditor({
 }
 
 function ContactInfo({ lead }: { lead: PipelineLeadRow }) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [email, setEmail] = useState(lead.email ?? "");
@@ -600,7 +603,7 @@ function ContactInfo({ lead }: { lead: PipelineLeadRow }) {
         }),
       });
       setEditing(false);
-      window.location.reload();
+      router.refresh();
     } catch {
       setSaving(false);
     }
@@ -728,6 +731,7 @@ function ReactivateButton({
   businessId: string;
   pipelineId: string;
 }) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   async function handleReactivate() {
@@ -738,7 +742,7 @@ function ReactivateButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stage: "new" }),
       });
-      window.location.reload();
+      router.refresh();
     } catch {
       setLoading(false);
     }

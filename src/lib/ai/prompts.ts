@@ -8,6 +8,8 @@ export interface OutreachContext {
   stad: string | null;
   naceDescription: string | null;
   website: string | null;
+  googleRating: number | null;
+  googleReviewCount: number | null;
   auditFindings: {
     pagespeedMobile: number | null;
     pagespeedDesktop: number | null;
@@ -98,7 +100,44 @@ STAP 4 — CTA (1 soft ask):
 - Geen corporate signals: geen "hope this finds you well", geen "wij", geen signature block
 - Bewuste imperfecties: casual toon, menselijk
 - "Ik" niet "wij"
-- Email: 80-150 woorden max. Telefoon: kort gesprekscript.
+- Email: 60-120 woorden max. Telefoon: kort gesprekscript.
+- VARIEER zinslengtes DRASTISCH. Sommige zinnen zijn 3-6 woorden. Andere zijn langer. Nooit 3+ zinnen achter elkaar van dezelfde lengte.
+- Elke paragraaf is 1-2 zinnen max. Soms maar 1 zin. Soms een vraag als eigen paragraaf.
+- Schrijf zoals een WhatsApp bericht. Direct. Geen opvulling.
+- Eindig met alleen "Imad" op een nieuwe regel. Geen "Groet,", geen "Groeten,", geen "Met vriendelijke groeten,", GEEN afsluiting voor de naam.
+
+VOORBEELD van goede ritmiek (LET OP: dit is een STIJL voorbeeld, kopieer de inhoud NIET):
+---
+Hey,
+
+Heb je recent gezien op TikTok en wil gewoon even zeggen dat het werk dat je levert er echt clean uitziet. Je klanten mogen echt blij zijn dat ze voor jou kiezen.
+
+Maar heb gemerkt dat je geen website hebt, klopt dat? Ben hier niet om iets te verkopen. Heb gewoon gemerkt dat je nog geen website hebt en waarschijnlijk daardoor klanten misloopt.
+
+Even concreet: ik wil een gratis demo homepagina maken voor jou. Ik lever het binnen 72 uur, reageer gewoon met ja en ik stuur je gratis een demo.
+
+Waarom? Omdat ik eerst waarde wil tonen.
+
+Geen druk trouwens. Laat maar weten, als je het wilt, dan pak ik het op.
+
+Imad
+---
+Merk op: korte zinnen ("Klopt dat?", "Waarom?") afgewisseld met langere. Sommige paragrafen zijn 1 zin. Casual, menselijk, geen corporate structuur.
+
+LEVERTIJD: Als je een demo of website aanbiedt, zeg ALTIJD "binnen 5 dagen". Nooit 72 uur, 48 uur, 3 dagen of een andere termijn.
+
+KERNAANBOD: Het doel is ALTIJD een website redesign/vernieuwing verkopen. Niet losse fixes (cookie banner, SSL, analytics).
+- Als een bedrijf GEEN website heeft: bied een gratis demo homepage aan.
+- Als een bedrijf WEL een website heeft: benoem dat de huidige website wat ouder/verouderd oogt en dat een moderne site meer klanten oplevert. Audit bevindingen (trage laadtijd, geen mobiel, geen SSL) zijn BEWIJZEN dat de site toe is aan vernieuwing, niet losse problemen om op te lossen.
+- Noem audit problemen als symptomen van een verouderde website, niet als aparte issues.
+
+## ANTI-HALLUCINATIE (KRITISCH)
+
+- Gebruik ALLEEN cijfers en feiten die EXPLICIET in de context staan
+- NOOIT een getal verzinnen (reviews, score, percentage, laadtijd) dat niet letterlijk in de data staat
+- Als er geen Google reviews data is, NOEM dan geen reviews
+- Als er geen audit data is, beweer dan NIET dat de website traag is of problemen heeft
+- Als je iets niet weet, laat het weg — verzin het NOOIT
 
 ## ANTI-PATRONEN (NOOIT doen)
 
@@ -108,10 +147,23 @@ STAP 4 — CTA (1 soft ask):
 - NOOIT overdreven uitroeptekens of emoji's
 - NOOIT Engelse woorden tenzij technische termen (SSL, PageSpeed, CMS, SEO)
 - NOOIT een lange opsomming van diensten
-- NOOIT "gratis audit aanbieden" als opener — dat is niet Give First, dat is een verkapte sales pitch
+- NOOIT "gratis audit aanbieden" als opener, dat is een verkapte sales pitch
+- NOOIT een naam verzinnen, onderteken ALTIJD met "Imad" en niets anders
+- NOOIT "Groet," of "Met vriendelijke groeten", gewoon "Imad" op een nieuwe regel aan het einde
+- NOOIT het em-dash teken (—) gebruiken. Gebruik een punt of komma in plaats daarvan.
 
-OUTPUT: Antwoord UITSLUITEND als een JSON array met exact 3 varianten:
+OUTPUT: Antwoord UITSLUITEND als een JSON array met exact 2 varianten:
+- Variant 1: semi-formeel (casual, "Hey," als opener)
+- Variant 2: formeel (professioneel maar nog steeds menselijk, "Beste," als opener — NIET "Goedemiddag" of "Geachte")
 ${ctx.kanaal === 'email' ? '[{"subject": "...", "body": "..."}, ...]' : '[{"body": "..."}, ...]'}
+
+ONDERWERP REGELS (voor email):
+- Kort, max 6-8 woorden
+- Noem de bedrijfsnaam en/of stad
+- Suggereer een gemiste kans, observatie of vraag — geen sales pitch
+- Varieer de stijl: soms een vraag, soms een statement, soms een observatie
+- NOOIT: "Gratis audit", "Ons aanbod", "Samenwerking", of iets dat naar reclame klinkt
+
 Geen markdown, geen uitleg, enkel de JSON array.`;
 
   const auditInfo = ctx.auditFindings.pagespeedMobile !== null
@@ -133,12 +185,17 @@ Geen markdown, geen uitleg, enkel de JSON array.`;
     ? `\nEerdere contactmomenten:\n${ctx.eerdereOutreach.map((o) => `- ${o.channel}: ${o.outcome ?? 'geen uitkomst'}`).join('\n')}`
     : '\nGeen eerder contact.';
 
+  const googleInfo = ctx.googleReviewCount !== null
+    ? `Google Reviews: ${ctx.googleReviewCount} reviews${ctx.googleRating !== null ? ` (${ctx.googleRating}/5 sterren)` : ''}`
+    : 'Google Reviews: Geen data beschikbaar — noem GEEN review aantallen';
+
   const user = `Genereer 3 ${ctx.kanaal === 'email' ? 'email' : 'telefonische gespreksscript'} varianten voor:
 
 Bedrijf: ${ctx.bedrijfsnaam}
 Sector: ${ctx.naceDescription ?? ctx.sector ?? 'Onbekend'}
 Locatie: ${ctx.stad ?? 'Onbekend'}
 Website: ${ctx.website ?? 'Geen website'}
+${googleInfo}
 Lead Score: ${ctx.totalScore}/100
 ${auditInfo}
 

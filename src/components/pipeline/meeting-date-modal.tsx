@@ -59,6 +59,16 @@ export function MeetingDateModal({
     }
   }, [open, initialDate]);
 
+  // Escape key handler
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onCancel]);
+
   if (!open) return null;
 
   function handleConfirm() {
@@ -76,6 +86,9 @@ export function MeetingDateModal({
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Afspraak plannen"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
     >
       <div className="w-full max-w-sm bg-white rounded-xl shadow-xl border border-card-border p-6 mx-4">

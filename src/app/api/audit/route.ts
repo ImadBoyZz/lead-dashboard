@@ -1,13 +1,21 @@
+import { timingSafeEqual } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
+import { env } from '@/lib/env';
 
 function authenticateN8n(request: Request): boolean {
   const auth = request.headers.get('authorization');
   if (!auth || !auth.startsWith('Bearer ')) return false;
-  return auth.slice(7) === process.env.N8N_WEBHOOK_SECRET;
+  const token = auth.slice(7);
+  const secret = env.N8N_WEBHOOK_SECRET;
+  if (!token || !secret) return false;
+  const tokenBuf = Buffer.from(token);
+  const secretBuf = Buffer.from(secret);
+  if (tokenBuf.length !== secretBuf.length) return false;
+  return timingSafeEqual(tokenBuf, secretBuf);
 }
 
 const auditPayloadSchema = z.object({
@@ -70,66 +78,80 @@ export async function POST(request: NextRequest) {
     }
 
     const { results } = parsed.data;
-    let processed = 0;
+    const now = new Date();
 
-    for (const result of results) {
-      // Upsert audit results
-      const auditValues = {
+    // Batch upsert audit results (1 query instead of 2N)
+    if (results.length > 0) {
+      const auditValues = results.map((result) => ({
         businessId: result.businessId,
         ...result.audit,
         sslExpiry: result.audit.sslExpiry
           ? new Date(result.audit.sslExpiry)
           : undefined,
         detectedTechnologies: result.audit.detectedTechnologies ?? [],
-        auditedAt: new Date(),
-      };
+        auditedAt: now,
+      }));
 
-      // Check if audit exists for this business
-      const existing = await db
-        .select({ id: schema.auditResults.id })
-        .from(schema.auditResults)
-        .where(eq(schema.auditResults.businessId, result.businessId))
-        .limit(1);
+      await db
+        .insert(schema.auditResults)
+        .values(auditValues)
+        .onConflictDoUpdate({
+          target: [schema.auditResults.businessId],
+          set: {
+            hasWebsite: sql`excluded.has_website`,
+            websiteUrl: sql`excluded.website_url`,
+            websiteHttpStatus: sql`excluded.website_http_status`,
+            pagespeedMobileScore: sql`excluded.pagespeed_mobile_score`,
+            pagespeedDesktopScore: sql`excluded.pagespeed_desktop_score`,
+            pagespeedFcp: sql`excluded.pagespeed_fcp`,
+            pagespeedLcp: sql`excluded.pagespeed_lcp`,
+            pagespeedCls: sql`excluded.pagespeed_cls`,
+            hasSsl: sql`excluded.has_ssl`,
+            sslExpiry: sql`excluded.ssl_expiry`,
+            sslIssuer: sql`excluded.ssl_issuer`,
+            isMobileResponsive: sql`excluded.is_mobile_responsive`,
+            hasViewportMeta: sql`excluded.has_viewport_meta`,
+            detectedCms: sql`excluded.detected_cms`,
+            cmsVersion: sql`excluded.cms_version`,
+            detectedTechnologies: sql`excluded.detected_technologies`,
+            serverHeader: sql`excluded.server_header`,
+            poweredBy: sql`excluded.powered_by`,
+            hasGoogleAnalytics: sql`excluded.has_google_analytics`,
+            hasGoogleTagManager: sql`excluded.has_google_tag_manager`,
+            hasFacebookPixel: sql`excluded.has_facebook_pixel`,
+            hasCookieBanner: sql`excluded.has_cookie_banner`,
+            hasMetaDescription: sql`excluded.has_meta_description`,
+            hasOpenGraph: sql`excluded.has_open_graph`,
+            hasStructuredData: sql`excluded.has_structured_data`,
+            auditedAt: sql`excluded.audited_at`,
+          },
+        });
 
-      if (existing.length > 0) {
+      // Batch upsert lead scores for results that have scores
+      const scoreResults = results.filter((r) => r.score);
+      if (scoreResults.length > 0) {
+        const scoreValues = scoreResults.map((result) => ({
+          businessId: result.businessId,
+          totalScore: result.score!.totalScore,
+          scoreBreakdown: result.score!.breakdown,
+          scoredAt: now,
+        }));
+
         await db
-          .update(schema.auditResults)
-          .set(auditValues)
-          .where(eq(schema.auditResults.businessId, result.businessId));
-      } else {
-        await db.insert(schema.auditResults).values(auditValues);
-      }
-
-      // Upsert lead score if provided
-      if (result.score) {
-        const existingScore = await db
-          .select({ id: schema.leadScores.id })
-          .from(schema.leadScores)
-          .where(eq(schema.leadScores.businessId, result.businessId))
-          .limit(1);
-
-        if (existingScore.length > 0) {
-          await db
-            .update(schema.leadScores)
-            .set({
-              totalScore: result.score.totalScore,
-              scoreBreakdown: result.score.breakdown,
-              scoredAt: new Date(),
-            })
-            .where(eq(schema.leadScores.businessId, result.businessId));
-        } else {
-          await db.insert(schema.leadScores).values({
-            businessId: result.businessId,
-            totalScore: result.score.totalScore,
-            scoreBreakdown: result.score.breakdown,
+          .insert(schema.leadScores)
+          .values(scoreValues)
+          .onConflictDoUpdate({
+            target: [schema.leadScores.businessId],
+            set: {
+              totalScore: sql`excluded.total_score`,
+              scoreBreakdown: sql`excluded.score_breakdown`,
+              scoredAt: sql`excluded.scored_at`,
+            },
           });
-        }
       }
-
-      processed++;
     }
 
-    return NextResponse.json({ processed }, { status: 200 });
+    return NextResponse.json({ processed: results.length }, { status: 200 });
   } catch (error) {
     console.error('Audit error:', error);
     return NextResponse.json(

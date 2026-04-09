@@ -9,7 +9,7 @@ import { generateInsightsPrompt, type InsightsData } from '@/lib/ai/prompts';
 import { logAIUsage } from '@/lib/ai/cost-tracker';
 
 export async function GET(request: NextRequest) {
-  if (!isValidSession(request)) {
+  if (!(await isValidSession(request))) {
     return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 });
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Mail, Phone, ExternalLink, MessageCircle, Users, Clock } from "lucide-react";
+import { Mail, Phone, ExternalLink, MessageCircle, Users, Clock, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { FollowUpCard } from "@/components/ai/follow-up-card";
 
@@ -15,6 +15,85 @@ interface OutreachEntry {
   structuredOutcome: string | null;
   durationMinutes: number | null;
   nextAction: string | null;
+  gmailThreadId: string | null;
+}
+
+interface ThreadMessage {
+  from: string;
+  to: string;
+  subject: string;
+  body: string;
+  date: string;
+  isReply: boolean;
+}
+
+function ThreadView({ threadId }: { threadId: string }) {
+  const [messages, setMessages] = useState<ThreadMessage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadThread() {
+    if (messages.length > 0) {
+      setOpen(!open);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/gmail/thread/${threadId}`);
+      if (!res.ok) throw new Error("Thread ophalen mislukt");
+      const data = await res.json();
+      setMessages(data.messages);
+      setOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fout");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={loadThread}
+        className="flex items-center gap-1.5 text-xs text-accent hover:underline"
+      >
+        {loading ? (
+          <Clock className="h-3 w-3 animate-spin" />
+        ) : open ? (
+          <ChevronUp className="h-3 w-3" />
+        ) : (
+          <MessageSquare className="h-3 w-3" />
+        )}
+        {loading ? "Laden..." : open ? "Verberg reactie" : "Bekijk reactie"}
+      </button>
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {open && messages.length > 0 && (
+        <div className="mt-2 space-y-3">
+          {messages.map((msg, i) => (
+            <div
+              key={i}
+              className={`rounded-lg p-3 text-sm ${
+                msg.isReply
+                  ? "bg-blue-50 border border-blue-200"
+                  : "bg-gray-50 border border-gray-200"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className={`text-xs font-medium ${msg.isReply ? "text-blue-700" : "text-gray-600"}`}>
+                  {msg.isReply ? "Reactie" : "Verzonden"}
+                </span>
+                <span className="text-xs text-muted">{msg.date}</span>
+              </div>
+              <p className="whitespace-pre-wrap text-sm">{msg.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const CHANNEL_ICONS: Record<string, React.ElementType> = {
@@ -87,6 +166,9 @@ export function OutreachTimeline({ businessId }: OutreachTimelineProps) {
                 <p className="text-xs mt-0.5">
                   <span className="text-muted">Volgende stap:</span> {entry.nextAction}
                 </p>
+              )}
+              {entry.gmailThreadId && (
+                <ThreadView threadId={entry.gmailThreadId} />
               )}
               {(entry.outcome || entry.structuredOutcome) && (
                 <FollowUpCard outreachLogId={entry.id} businessId={businessId} />

@@ -12,6 +12,7 @@ interface Column<T> {
 interface DataTableProps<T> {
   columns: Column<T>[];
   data: T[];
+  keyField?: keyof T;
   onSort?: (key: string) => void;
   currentSort?: string;
   sortOrder?: "asc" | "desc";
@@ -34,6 +35,7 @@ function SkeletonRow({ columns }: { columns: number }) {
 export function DataTable<T>({
   columns,
   data,
+  keyField,
   onSort,
   currentSort,
   sortOrder,
@@ -89,7 +91,7 @@ export function DataTable<T>({
           ) : (
             data.map((item, rowIndex) => (
               <tr
-                key={rowIndex}
+                key={keyField ? String(item[keyField]) : rowIndex}
                 className={cn(
                   "transition-colors hover:bg-blue-50/40",
                   rowIndex % 2 === 1 && "bg-gray-50/40"

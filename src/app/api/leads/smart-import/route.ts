@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
@@ -87,23 +88,25 @@ export async function GET(request: NextRequest) {
   }
 }
 
+const importSchema = z.object({
+  sector: z.string().min(1),
+  city: z.string().min(1),
+  selectedPlaceIds: z.array(z.string()).optional(),
+  count: z.number().int().min(1).max(200).default(25),
+});
+
 // POST — Import discovered leads into businesses + scoring + pipeline
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { sector, city, selectedPlaceIds, count = 25 } = body as {
-      sector: string;
-      city: string;
-      selectedPlaceIds?: string[];
-      count?: number;
-    };
-
-    if (!sector || !city) {
+    const parsed = importSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Missing required fields: sector and city' },
+        { error: 'Validation failed', details: parsed.error.flatten() },
         { status: 400 },
       );
     }
+    const { sector, city, selectedPlaceIds, count } = parsed.data;
 
     // Gebruik dezelfde multi-query logica als de GET preview
     const subsectors = buildSearchQueries(sector, city, 99);

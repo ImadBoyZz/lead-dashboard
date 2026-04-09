@@ -12,14 +12,13 @@ const PUBLIC_PATHS = [
   '/api/gmail/callback', // Google OAuth callback
 ];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Static files & Next.js internals skippen
   if (
     pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon') ||
-    pathname.includes('.')
+    pathname.startsWith('/favicon')
   ) {
     return NextResponse.next();
   }
@@ -30,7 +29,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Session checken
-  if (!isValidSession(request)) {
+  if (!(await isValidSession(request))) {
     // API routes: 401
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -1,17 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { isValidSession } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
-  if (!isValidSession(request)) {
+  if (!(await isValidSession(request))) {
     return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 });
   }
 
   const campaignId = request.nextUrl.searchParams.get('campaignId');
   if (!campaignId) {
     return NextResponse.json({ error: 'campaignId is vereist' }, { status: 400 });
+  }
+
+  const uuidCheck = z.string().uuid().safeParse(campaignId);
+  if (!uuidCheck.success) {
+    return NextResponse.json({ error: 'Ongeldig campaignId formaat' }, { status: 400 });
   }
 
   try {

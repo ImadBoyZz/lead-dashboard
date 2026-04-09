@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq, and, notInArray } from 'drizzle-orm';
+import { eq, and, notInArray, desc } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { isValidAgentToken } from '@/lib/agent-auth';
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
           notInArray(schema.leadPipeline.stage, ['won', 'ignored']),
         )
       )
-      .orderBy(schema.leadScores.totalScore);
+      .orderBy(desc(schema.leadScores.totalScore));
 
     return NextResponse.json(leads);
   } catch (error) {

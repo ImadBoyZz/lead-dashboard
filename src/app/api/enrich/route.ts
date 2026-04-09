@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -6,13 +7,23 @@ import { computeScore } from '@/lib/scoring';
 import { lookupGooglePlaces } from '@/lib/google-places';
 import { rateLimit } from '@/lib/rate-limit';
 
+const enrichSchema = z.object({
+  businessId: z.string().uuid(),
+});
+
 export async function POST(request: NextRequest) {
   const { allowed } = rateLimit('enrich', 30, 60 * 1000); // 30 per minuut
   if (!allowed) {
     return NextResponse.json({ error: 'Te veel verzoeken. Probeer over een minuut opnieuw.' }, { status: 429 });
   }
 
-  const { businessId } = await request.json();
+  try {
+  const body = await request.json();
+  const parsed = enrichSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Ongeldig verzoek', details: parsed.error.flatten() }, { status: 400 });
+  }
+  const { businessId } = parsed.data;
 
   // 1. Get the business from DB
   const business = await db.query.businesses.findFirst({
@@ -138,7 +149,12 @@ export async function POST(request: NextRequest) {
       }),
     });
 
-    const firecrawlData = await firecrawlResponse.json();
+    let firecrawlData: Record<string, unknown> | null = null;
+    if (firecrawlResponse.ok) {
+      firecrawlData = await firecrawlResponse.json();
+    } else {
+      console.error('Firecrawl API error:', firecrawlResponse.status, await firecrawlResponse.text().catch(() => ''));
+    }
 
     // 3b. Google PageSpeed API
     let pagespeedMobile: number | null = null;
@@ -157,9 +173,11 @@ export async function POST(request: NextRequest) {
           psData.lighthouseResult.categories.performance.score * 100,
         );
         const audits = psData.lighthouseResult.audits;
-        pagespeedFcp = audits['first-contentful-paint']?.numericValue / 1000 || null;
-        pagespeedLcp = audits['largest-contentful-paint']?.numericValue / 1000 || null;
-        pagespeedCls = audits['cumulative-layout-shift']?.numericValue || null;
+        const fcpVal = audits['first-contentful-paint']?.numericValue;
+        pagespeedFcp = fcpVal != null ? fcpVal / 1000 : null;
+        const lcpVal = audits['largest-contentful-paint']?.numericValue;
+        pagespeedLcp = lcpVal != null ? lcpVal / 1000 : null;
+        pagespeedCls = audits['cumulative-layout-shift']?.numericValue ?? null;
       }
 
       const psDesktop = await fetch(
@@ -176,7 +194,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 3c. Extract Firecrawl results
-    const extracted = firecrawlData?.data?.json || {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const extracted: Record<string, any> = (firecrawlData as any)?.data?.json || {};
 
     // 3d. Update contact info from website scrape if missing
     if (!business.email && extracted.contactEmail) {
@@ -339,4 +358,8 @@ export async function POST(request: NextRequest) {
     breakdown: scoreResult.breakdown,
     audit: auditData,
   });
+  } catch (error) {
+    console.error('Enrich error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

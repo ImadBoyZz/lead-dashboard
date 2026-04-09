@@ -138,22 +138,25 @@ export async function PATCH(
 
       const fromStatus = currentStatus?.status ?? null;
 
+      // Map pipeline stages naar leadStatuses enum ('ignored' bestaat niet in leadStatusEnum)
+      const statusForDb = status === 'ignored' ? 'disqualified' : status;
+
       // Build update fields
       const statusUpdate: Record<string, unknown> = {
-        status,
+        status: statusForDb,
         statusChangedAt: new Date(),
       };
 
-      if (status === 'contacted') statusUpdate.contactedAt = new Date();
-      if (status === 'meeting') statusUpdate.meetingAt = new Date();
-      if (status === 'won' || status === 'ignored') statusUpdate.closedAt = new Date();
+      if (statusForDb === 'contacted') statusUpdate.contactedAt = new Date();
+      if (statusForDb === 'meeting') statusUpdate.meetingAt = new Date();
+      if (statusForDb === 'won' || statusForDb === 'disqualified') statusUpdate.closedAt = new Date();
 
       await db
         .update(schema.leadStatuses)
         .set(statusUpdate)
         .where(eq(schema.leadStatuses.businessId, id));
 
-      // Insert status history
+      // Insert status history (toon originele status naam voor UI)
       await db.insert(schema.statusHistory).values({
         businessId: id,
         fromStatus,
