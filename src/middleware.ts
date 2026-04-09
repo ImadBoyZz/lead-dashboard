@@ -8,6 +8,7 @@ const PUBLIC_PATHS = [
   '/api/sync',        // n8n webhook (eigen Bearer auth)
   '/api/audit',       // n8n webhook (eigen Bearer auth)
   '/api/reminders/due', // n8n webhook (eigen Bearer auth)
+  '/api/agent',         // managed agent endpoints (eigen Bearer auth)
 ];
 
 export function middleware(request: NextRequest) {

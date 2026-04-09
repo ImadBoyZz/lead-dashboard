@@ -244,12 +244,19 @@ export default async function LeadDetailPage({ params }: PageProps) {
                 <p className="text-sm text-muted">Nog geen notities</p>
               )}
               {leadNotes.map((note) => (
-                <div key={note.id} className="border-l-2 border-accent/30 pl-3 py-1 flex items-start gap-2">
+                <div key={note.id} className={`border-l-2 pl-3 py-1 flex items-start gap-2 ${note.author === 'agent' ? 'border-purple-400 bg-purple-50/50' : 'border-accent/30'}`}>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                    <p className="text-xs text-muted mt-1">{formatDate(note.createdAt)}</p>
+                    <div className="flex items-center gap-2">
+                      {note.author === 'agent' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                          AI
+                        </span>
+                      )}
+                      <p className="text-xs text-muted">{formatDate(note.createdAt)}</p>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap mt-1">{note.content}</p>
                   </div>
-                  <DeleteNoteButton noteId={note.id} />
+                  {note.author !== 'agent' && <DeleteNoteButton noteId={note.id} />}
                 </div>
               ))}
               <div className="pt-2 border-t border-card-border">

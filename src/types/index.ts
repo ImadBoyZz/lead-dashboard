@@ -9,6 +9,9 @@ export type LeadStatus = typeof schema.leadStatuses.$inferSelect;
 export type Note = typeof schema.notes.$inferSelect;
 export type StatusHistoryEntry = typeof schema.statusHistory.$inferSelect;
 export type ImportLog = typeof schema.importLogs.$inferSelect;
+export type OutreachDraft = typeof schema.outreachDrafts.$inferSelect;
+export type ScoringFeedback = typeof schema.scoringFeedback.$inferSelect;
+export type AIUsageLog = typeof schema.aiUsageLog.$inferSelect;
 
 // ── Inferred Insert types ──────────────────────────────
 
@@ -19,6 +22,10 @@ export type NewLeadStatus = typeof schema.leadStatuses.$inferInsert;
 export type NewNote = typeof schema.notes.$inferInsert;
 export type NewStatusHistoryEntry = typeof schema.statusHistory.$inferInsert;
 export type NewImportLog = typeof schema.importLogs.$inferInsert;
+export type NewOutreachDraft = typeof schema.outreachDrafts.$inferInsert;
+export type NewScoringFeedback = typeof schema.scoringFeedback.$inferInsert;
+export type AgentAction = typeof schema.agentActions.$inferSelect;
+export type NewAgentAction = typeof schema.agentActions.$inferInsert;
 
 // ── Composite types ────────────────────────────────────
 
