@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { PRIORITY_OPTIONS } from "@/lib/constants";
+import { StaleBadge } from "./stale-badge";
+import { ScorePill } from "./score-pill";
 
 export interface PipelineCardData {
   pipelineId: string;
@@ -13,6 +15,8 @@ export interface PipelineCardData {
   stage: string;
   priority: string;
   stageChangedAt: Date | string;
+  leadScore?: number | null;
+  dealValue?: number | null;
 }
 
 interface PipelineCardProps {
@@ -31,12 +35,6 @@ export function PipelineCard({ card, isOverlay }: PipelineCardProps) {
 
   const priorityConfig = PRIORITY_OPTIONS.find((p) => p.value === card.priority);
 
-  const days = (() => {
-    if (!card.stageChangedAt) return null;
-    const diff = Date.now() - new Date(card.stageChangedAt).getTime();
-    return Math.floor(diff / (1000 * 60 * 60 * 24));
-  })();
-
   return (
     <div
       ref={setNodeRef}
@@ -45,19 +43,26 @@ export function PipelineCard({ card, isOverlay }: PipelineCardProps) {
       {...listeners}
       className={
         "block bg-white rounded-lg border border-card-border p-3 cursor-grab active:cursor-grabbing transition-all " +
-        (isOverlay ? "shadow-lg ring-2 ring-accent/20" : "hover:shadow-sm hover:border-accent/30")
+        (isOverlay
+          ? "shadow-lg ring-2 ring-accent/20"
+          : "hover:shadow-sm hover:border-accent/30")
       }
     >
-      <Link href={"/leads/" + card.businessId} className="block" onClick={(e) => e.stopPropagation()}>
-        <p className="text-sm font-medium text-foreground truncate">
-          {card.name}
-        </p>
-        <p className="text-xs text-muted mt-0.5">
-          {card.city ?? "Onbekend"}
-        </p>
+      <Link
+        href={"/leads/" + card.businessId}
+        className="block"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium text-foreground truncate flex-1">
+            {card.name}
+          </p>
+          <ScorePill score={card.leadScore} />
+        </div>
+        <p className="text-xs text-muted mt-0.5">{card.city ?? "Onbekend"}</p>
       </Link>
-      <div className="flex items-center justify-between mt-2">
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between mt-2 gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
           {priorityConfig && card.priority !== "medium" && (
             <span
               className={
@@ -68,10 +73,13 @@ export function PipelineCard({ card, isOverlay }: PipelineCardProps) {
               {priorityConfig.label}
             </span>
           )}
+          {card.dealValue && card.dealValue > 0 && (
+            <span className="text-[11px] font-semibold text-foreground">
+              €{card.dealValue.toLocaleString("nl-BE")}
+            </span>
+          )}
         </div>
-        {days !== null && (
-          <span className="text-xs text-muted">{days}d</span>
-        )}
+        <StaleBadge stageChangedAt={card.stageChangedAt} />
       </div>
     </div>
   );

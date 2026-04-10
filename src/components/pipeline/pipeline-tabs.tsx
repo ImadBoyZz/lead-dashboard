@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,6 +17,10 @@ import {
 import { PIPELINE_STAGE_OPTIONS, OUTREACH_CHANNEL_OPTIONS } from "@/lib/constants";
 import { DataTable } from "@/components/ui/data-table";
 import { AppointmentsWeekView } from "./appointments-week-view";
+import { StaleBadge } from "./stale-badge";
+import { ScorePill } from "./score-pill";
+import { InlineStagePicker } from "./inline-stage-picker";
+import { BulkActionBar } from "./bulk-action-bar";
 
 // ── Types ─────────────────────────────────────────────
 
@@ -30,6 +34,9 @@ export interface PipelineLeadRow {
   priority: string;
   dealValue: number | null;
   wonValue: number | null;
+  frozen: boolean;
+  leadScore: number | null;
+  leadTemperature: string | null;
   contactMethod: string | null;
   lastOutreachChannel: string | null;
   lastOutreachAt: Date | string | null;
@@ -123,18 +130,23 @@ export function PipelineTabs({ leads, selectedStage }: PipelineTabsProps) {
     (selectedStage as TabValue) || "contacted"
   );
 
-  // Sync with external selectedStage changes (from stats click)
-  useEffect(() => {
+  // Sync with external selectedStage changes (from stats click).
+  // React's "during-render" state update pattern — React will discard
+  // the first render and re-render with the new state, no effect needed.
+  const [prevSelectedStage, setPrevSelectedStage] = useState(selectedStage);
+  if (selectedStage !== prevSelectedStage) {
+    setPrevSelectedStage(selectedStage);
     if (selectedStage) {
       const validTab = TABS.find((t) => t.value === selectedStage);
       if (validTab) {
         setActiveTab(validTab.value);
       }
     }
-  }, [selectedStage]);
+  }
   const [search, setSearch] = useState("");
   const [channelFilter, setChannelFilter] = useState("");
   const [sectorFilter, setSectorFilter] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Filter leads by active tab + search + filters
   const filteredLeads = useMemo(() => {
@@ -184,16 +196,56 @@ export function PipelineTabs({ leads, selectedStage }: PipelineTabsProps) {
       }));
   }, [filteredLeads, activeTab]);
 
-  // Reset filters on tab change
+  // Reset filters + selection on tab change
   function handleTabChange(tab: TabValue) {
     setActiveTab(tab);
     setSearch("");
     setChannelFilter("");
     setSectorFilter("");
+    setSelectedIds(new Set());
   }
 
-  // Column definitions per tab
-  const columns = getColumnsForTab(activeTab);
+  // No reactive clear — BulkActionBar's onClear handles it after successful bulk.
+  // Stale IDs (leads that left the current stage) auto-drop out of filteredLeads.
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (filteredLeads.every((l) => selectedIds.has(l.pipelineId))) {
+      // Deselect visible
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredLeads.forEach((l) => next.delete(l.pipelineId));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredLeads.forEach((l) => next.add(l.pipelineId));
+        return next;
+      });
+    }
+  }
+
+  const allVisibleSelected =
+    filteredLeads.length > 0 &&
+    filteredLeads.every((l) => selectedIds.has(l.pipelineId));
+
+  // Column definitions per tab — pass selection state for checkbox column
+  const columns = getColumnsForTab(activeTab, {
+    selectedIds,
+    onToggle: toggleSelect,
+    allVisibleSelected,
+    onToggleAll: toggleSelectAll,
+    hasVisibleRows: filteredLeads.length > 0,
+  });
 
   const tabCount = (stage: string) =>
     leads.filter((l) => l.stage === stage).length;
@@ -298,24 +350,77 @@ export function PipelineTabs({ leads, selectedStage }: PipelineTabsProps) {
         data={filteredLeads}
         emptyMessage={`Geen leads in "${TABS.find((t) => t.value === activeTab)?.label}"`}
       />
+
+      {/* Floating bulk action bar — zichtbaar wanneer er iets geselecteerd is */}
+      <BulkActionBar
+        selectedIds={Array.from(selectedIds)}
+        onClear={() => setSelectedIds(new Set())}
+      />
     </div>
   );
 }
 
 // ── Column definitions per tab ────────────────────────
 
-function getColumnsForTab(tab: TabValue) {
+interface SelectionArgs {
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+  allVisibleSelected: boolean;
+  onToggleAll: () => void;
+  hasVisibleRows: boolean;
+}
+
+function getColumnsForTab(tab: TabValue, selection: SelectionArgs) {
+  const checkboxColumn = {
+    key: "select",
+    className: "w-10",
+    header: (
+      <input
+        type="checkbox"
+        aria-label="Selecteer alles"
+        checked={selection.allVisibleSelected}
+        disabled={!selection.hasVisibleRows}
+        onChange={selection.onToggleAll}
+        className="h-4 w-4 cursor-pointer rounded border-gray-300 text-accent focus:ring-accent"
+      />
+    ),
+    render: (item: PipelineLeadRow) => (
+      <input
+        type="checkbox"
+        aria-label={`Selecteer ${item.name}`}
+        checked={selection.selectedIds.has(item.pipelineId)}
+        onChange={() => selection.onToggle(item.pipelineId)}
+        onClick={(e) => e.stopPropagation()}
+        className="h-4 w-4 cursor-pointer rounded border-gray-300 text-accent focus:ring-accent"
+      />
+    ),
+  };
+
   const baseColumns = [
+    checkboxColumn,
     {
       key: "name",
       header: "Bedrijf",
       render: (item: PipelineLeadRow) => (
-        <Link
-          href={`/leads/${item.businessId}`}
-          className="text-sm font-medium text-foreground hover:text-accent transition-colors"
-        >
-          {item.name}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/leads/${item.businessId}`}
+            className={`text-sm font-medium transition-colors hover:text-accent ${
+              item.frozen ? "text-muted italic" : "text-foreground"
+            }`}
+          >
+            {item.name}
+          </Link>
+          {item.frozen && (
+            <span
+              className="text-[10px] font-medium text-muted"
+              title="Frozen — buiten actieve queue"
+            >
+              ❄
+            </span>
+          )}
+          <ScorePill score={item.leadScore} />
+        </div>
       ),
     },
     {
@@ -326,6 +431,28 @@ function getColumnsForTab(tab: TabValue) {
       ),
     },
   ];
+
+  // Stale badge kolom — zichtbaar voor alle open stages (niet voor won/ignored)
+  const staleColumn = {
+    key: "stale",
+    header: "Actie",
+    render: (item: PipelineLeadRow) => (
+      <StaleBadge stageChangedAt={item.stageChangedAt} />
+    ),
+  };
+
+  // Inline stage picker kolom — quick action om lead naar andere stage te verplaatsen
+  const pickerColumn = {
+    key: "picker",
+    header: "",
+    className: "w-28",
+    render: (item: PipelineLeadRow) => (
+      <InlineStagePicker
+        pipelineId={item.pipelineId}
+        currentStage={item.stage}
+      />
+    ),
+  };
 
   switch (tab) {
     case "contacted":
@@ -354,6 +481,8 @@ function getColumnsForTab(tab: TabValue) {
             <span className="text-sm text-muted">{item.sector ?? "—"}</span>
           ),
         },
+        staleColumn,
+        pickerColumn,
       ];
 
     case "quote_sent":
@@ -390,6 +519,8 @@ function getColumnsForTab(tab: TabValue) {
             );
           },
         },
+        staleColumn,
+        pickerColumn,
       ];
 
     case "meeting":
@@ -418,6 +549,8 @@ function getColumnsForTab(tab: TabValue) {
           header: "Prioriteit",
           render: (item: PipelineLeadRow) => <PriorityBadge priority={item.priority} />,
         },
+        staleColumn,
+        pickerColumn,
       ];
 
     case "won":

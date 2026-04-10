@@ -19,6 +19,7 @@ interface StageStat {
 interface PipelineStatsProps {
   stats: StageStat[];
   totalLeads: number;
+  frozenCount?: number;
   onStageClick: (stage: string) => void;
 }
 
@@ -43,9 +44,10 @@ const STAGE_ACCENT: Record<string, string> = {
 export function PipelineStats({
   stats,
   totalLeads,
+  frozenCount = 0,
   onStageClick,
 }: PipelineStatsProps) {
-  // Calculate active leads (excluding won + ignored)
+  // Active = in-progress stages only (excluding won + ignored + frozen).
   const activeLeads = stats
     .filter((s) => s.stage !== "won" && s.stage !== "ignored")
     .reduce((sum, s) => sum + s.count, 0);
@@ -78,12 +80,15 @@ export function PipelineStats({
         </div>
         <span className="text-xs font-medium text-muted">
           {totalLeads} totaal
+          {frozenCount > 0 && (
+            <span className="ml-1 opacity-60">· +{frozenCount} frozen</span>
+          )}
         </span>
       </div>
 
-      {/* Stage tiles */}
-      <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
-        {PIPELINE_STAGE_OPTIONS.map((option) => {
+      {/* Stage tiles — 'new' wordt niet getoond: leads met stage=new leven op /warm */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {PIPELINE_STAGE_OPTIONS.filter((o) => o.value !== "new").map((option) => {
           const stat = stats.find((s) => s.stage === option.value);
           const count = stat?.count ?? 0;
           const value = stat?.totalValue ?? 0;

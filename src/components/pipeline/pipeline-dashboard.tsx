@@ -1,25 +1,42 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
-import Link from "next/link";
-import { KanbanSquare } from "lucide-react";
+import { useMemo } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { PipelineStats } from "./pipeline-stats";
 import { PipelineTabs } from "./pipeline-tabs";
 import type { PipelineLeadRow } from "./pipeline-tabs";
+import { PipelineBoard } from "./pipeline-board";
+import type { PipelineCardData } from "./pipeline-card";
 import { PIPELINE_STAGE_OPTIONS } from "@/lib/constants";
+import { PipelineViewSwitcher } from "./pipeline-view-switcher";
+import type { PipelineView } from "@/lib/pipeline/view";
+import { CapacityMeter } from "./capacity-meter";
+import { TodayView } from "./today-view";
+import { MoneyView } from "./money-view";
 
 interface PipelineDashboardProps {
   leads: PipelineLeadRow[];
+  view: PipelineView;
+  selectedStage?: string;
+  activeCount: number;
 }
 
-export function PipelineDashboard({ leads }: PipelineDashboardProps) {
-  const [selectedStage, setSelectedStage] = useState<string | undefined>();
-  const tabsRef = useRef<HTMLDivElement>(null);
+export function PipelineDashboard({
+  leads,
+  view,
+  selectedStage,
+  activeCount,
+}: PipelineDashboardProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  // Compute stats from leads
-  const stats = useMemo(() => {
-    return PIPELINE_STAGE_OPTIONS.map((option) => {
-      const stageLeads = leads.filter((l) => l.stage === option.value);
+  // Stats exclude frozen zodat de "actieve queue" telt wat je echt werkt.
+  const { stats, frozenCount } = useMemo(() => {
+    const activeLeads = leads.filter((l) => !l.frozen);
+    const frozen = leads.length - activeLeads.length;
+    const computed = PIPELINE_STAGE_OPTIONS.map((option) => {
+      const stageLeads = activeLeads.filter((l) => l.stage === option.value);
       return {
         stage: option.value,
         count: stageLeads.length,
@@ -29,43 +46,60 @@ export function PipelineDashboard({ leads }: PipelineDashboardProps) {
         ),
       };
     });
+    return { stats: computed, frozenCount: frozen };
   }, [leads]);
 
+  // Stat card click schrijft stage naar URL en switcht naar list view.
   function handleStageClick(stage: string) {
-    // Map "new" to "contacted" since "new" has no tab
-    const tabStage = stage === "new" ? "contacted" : stage;
-    setSelectedStage(tabStage);
-
-    // Scroll to tabs
-    setTimeout(() => {
-      tabsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("view", "list");
+    // "new" heeft geen tab in list view → map naar contacted
+    params.set("stage", stage === "new" ? "contacted" : stage);
+    router.push(`${pathname}?${params.toString()}`);
   }
+
+  // Kanban board data (zelfde leads, simpeler shape).
+  const boardCards: PipelineCardData[] = useMemo(
+    () =>
+      leads
+        .filter((l) => !l.frozen)
+        .map((l) => ({
+          pipelineId: l.pipelineId,
+          businessId: l.businessId,
+          name: l.name,
+          city: l.city,
+          stage: l.stage,
+          priority: l.priority,
+          stageChangedAt: l.stageChangedAt,
+          leadScore: l.leadScore,
+          dealValue: l.dealValue,
+        })),
+    [leads]
+  );
 
   return (
     <>
-      {/* Pipeline stats tiles */}
+      {/* Header strip: view switcher + capacity meter */}
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <PipelineViewSwitcher current={view} />
+        <CapacityMeter active={activeCount} />
+      </div>
+
+      {/* Stats tiles altijd zichtbaar als context */}
       <PipelineStats
         stats={stats}
-        totalLeads={leads.length}
+        totalLeads={leads.length - frozenCount}
+        frozenCount={frozenCount}
         onStageClick={handleStageClick}
       />
 
-      {/* Link to full Kanban view */}
-      <div className="flex items-center justify-end mb-4">
-        <Link
-          href="/pipeline/kanban"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-accent transition-colors"
-        >
-          <KanbanSquare className="h-3.5 w-3.5" />
-          Kanban weergave
-        </Link>
-      </div>
-
-      {/* Tabbed list views */}
-      <div ref={tabsRef}>
+      {/* View-specifieke content */}
+      {view === "today" && <TodayView leads={leads} />}
+      {view === "money" && <MoneyView leads={leads} />}
+      {view === "board" && <PipelineBoard initialData={boardCards} />}
+      {view === "list" && (
         <PipelineTabs leads={leads} selectedStage={selectedStage} />
-      </div>
+      )}
     </>
   );
 }
