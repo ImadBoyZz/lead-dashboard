@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, Loader2, Download, MapPin, Star, Globe, ExternalLink, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ALL_SECTORS } from "@/lib/places-discovery";
+import { PROVINCE_NAMES, parseProvinceValue, PROVINCE_CITIES } from "@/lib/regions";
 
 interface PreviewLead {
   placeId: string;
@@ -14,30 +15,43 @@ interface PreviewLead {
   website: string | null;
   rating: number | null;
   reviewCount: number | null;
+  businessStatus: string;
+  photosCount: number;
   googleMapsUri: string | null;
   hasWebsite: boolean;
   qualityScore: number;
   chainWarning: string | null;
+  discoveredInCity: string;  // welke stad leverde deze lead op
+}
+
+interface SearchProgress {
+  mode: 'city' | 'province';
+  currentCity: string | null;
+  completedCities: number;
+  totalCities: number;
+  failedCities: string[];
+  exhausted: boolean;  // true als alle steden doorzocht zijn maar target niet gehaald
 }
 
 
 const TARGET_OPTIONS = [
-  { value: 20, label: "~20 leads" },
-  { value: 40, label: "~40 leads" },
-  { value: 60, label: "~60 leads" },
-  { value: 100, label: "~100 leads" },
+  { value: 50,  label: "~50 leads" },
+  { value: 75,  label: "~75 leads" },
+  { value: 125, label: "~125 leads" },
+  { value: 200, label: "~200 leads" },
 ];
 
 export function SmartImportButton() {
   const router = useRouter();
   const [sector, setSector] = useState("");
   const [city, setCity] = useState("");
-  const [target, setTarget] = useState(20);
+  const [target, setTarget] = useState(50);
   const [searching, setSearching] = useState(false);
   const [importing, setImporting] = useState(false);
   const [preview, setPreview] = useState<PreviewLead[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<{ imported: number; duplicates: number } | null>(null);
+  const [progress, setProgress] = useState<SearchProgress | null>(null);
 
 
   async function handleSearch() {
@@ -47,24 +61,74 @@ export function SmartImportButton() {
     setResult(null);
     setSelected(new Set());
 
+    const provinceName = parseProvinceValue(city);
+    const cities = provinceName ? [...PROVINCE_CITIES[provinceName]] : [city];
+    const isProvince = provinceName !== null;
+
+    setProgress({
+      mode: isProvince ? 'province' : 'city',
+      currentCity: cities[0] ?? null,
+      completedCities: 0,
+      totalCities: cities.length,
+      failedCities: [],
+      exhausted: false,
+    });
+
+    const accumulated: PreviewLead[] = [];
+    const seenPlaceIds = new Set<string>();
+    const failed: string[] = [];
+
     try {
-      const res = await fetch(
-        `/api/leads/smart-import?sector=${encodeURIComponent(sector)}&city=${encodeURIComponent(city)}&target=${target}`
+      for (let i = 0; i < cities.length; i++) {
+        const currentCity = cities[i];
+        if (accumulated.length >= target) break;
+
+        setProgress((p) => (p ? { ...p, currentCity, completedCities: i } : p));
+
+        const remaining = target - accumulated.length;
+        try {
+          const res = await fetch(
+            `/api/leads/smart-import?sector=${encodeURIComponent(sector)}&city=${encodeURIComponent(currentCity)}&target=${remaining}`
+          );
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          for (const lead of (data.leads ?? []) as Omit<PreviewLead, "discoveredInCity">[]) {
+            if (!seenPlaceIds.has(lead.placeId)) {
+              seenPlaceIds.add(lead.placeId);
+              accumulated.push({ ...lead, discoveredInCity: currentCity });
+            }
+          }
+        } catch (err) {
+          console.error(`[Search] Stad ${currentCity} mislukt:`, err);
+          failed.push(currentCity);
+        }
+      }
+
+      const fullyExhausted = accumulated.length < target && failed.length === 0;
+      setProgress((p) =>
+        p
+          ? {
+              ...p,
+              completedCities: cities.length,
+              currentCity: null,
+              failedCities: failed,
+              exhausted: fullyExhausted,
+            }
+          : p
       );
-      const data = await res.json();
-      setPreview(data.leads ?? []);
-      setSelected(new Set((data.leads ?? []).map((l: PreviewLead) => l.placeId)));
-    } catch {
-      setPreview([]);
+      setPreview(accumulated);
+      setSelected(new Set(accumulated.map((l) => l.placeId)));
     } finally {
       setSearching(false);
     }
   }
 
   async function handleImport() {
-    if (!sector || !city.trim() || selected.size === 0) return;
+    if (!sector || selected.size === 0 || !preview) return;
     setImporting(true);
     setResult(null);
+
+    const selectedLeads = preview.filter((l) => selected.has(l.placeId));
 
     try {
       const res = await fetch("/api/leads/smart-import", {
@@ -72,9 +136,7 @@ export function SmartImportButton() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sector,
-          city: city.trim(),
-          selectedPlaceIds: Array.from(selected),
-          count: selected.size,
+          leads: selectedLeads,
         }),
       });
       const data = await res.json();
@@ -134,6 +196,13 @@ export function SmartImportButton() {
             className="rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="">Kies stad...</option>
+            <optgroup label="Hele provincie (alle steden)">
+              {PROVINCE_NAMES.map((p) => (
+                <option key={p} value={`province:${p}`}>
+                  {p} — alle steden
+                </option>
+              ))}
+            </optgroup>
             <optgroup label="Oost-Vlaanderen">
               <option value="Gent">Gent & omgeving</option>
               <option value="Aalst">Aalst & omgeving</option>
@@ -213,7 +282,11 @@ export function SmartImportButton() {
           ) : (
             <Search className="h-4 w-4" />
           )}
-          {searching ? "Zoeken..." : "Zoek leads"}
+          {searching
+            ? progress?.mode === "province" && progress.currentCity
+              ? `Zoeken in ${progress.currentCity}... (${progress.completedCities + 1}/${progress.totalCities})`
+              : "Zoeken..."
+            : "Zoek leads"}
         </Button>
       </div>
 
@@ -236,8 +309,20 @@ export function SmartImportButton() {
           <div className="relative z-10 w-full max-w-2xl max-h-[85vh] flex flex-col rounded-lg border border-border bg-card shadow-2xl mx-4">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <div className="text-sm font-medium">
-                {preview.length} leads gevonden
+              <div className="flex flex-col gap-1">
+                <div className="text-sm font-medium">
+                  {preview.length} leads gevonden
+                  {progress?.exhausted && progress.mode === "province" && (
+                    <span className="ml-2 text-xs font-normal text-muted">
+                      — provincie uitgeput, alle steden doorzocht
+                    </span>
+                  )}
+                </div>
+                {progress?.failedCities.length ? (
+                  <div className="text-xs text-orange-700">
+                    {progress.failedCities.length} stad/steden mislukt: {progress.failedCities.join(", ")}
+                  </div>
+                ) : null}
               </div>
               <div className="flex items-center gap-3">
                 {preview.length > 0 && (

@@ -88,11 +88,26 @@ export async function GET(request: NextRequest) {
   }
 }
 
+const previewLeadSchema = z.object({
+  placeId: z.string().min(1),
+  name: z.string().min(1),
+  address: z.string(),
+  phone: z.string().nullable(),
+  website: z.string().nullable(),
+  rating: z.number().nullable(),
+  reviewCount: z.number().nullable(),
+  businessStatus: z.string().default('OPERATIONAL'),
+  photosCount: z.number().default(0),
+  googleMapsUri: z.string().nullable(),
+  hasWebsite: z.boolean(),
+  qualityScore: z.number(),
+  chainWarning: z.string().nullable(),
+  discoveredInCity: z.string().min(1),
+});
+
 const importSchema = z.object({
   sector: z.string().min(1),
-  city: z.string().min(1),
-  selectedPlaceIds: z.array(z.string()).optional(),
-  count: z.number().int().min(1).max(200).default(25),
+  leads: z.array(previewLeadSchema).min(1).max(200),
 });
 
 // POST — Import discovered leads into businesses + scoring + pipeline
@@ -106,34 +121,13 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    const { sector, city, selectedPlaceIds, count } = parsed.data;
-
-    // Gebruik dezelfde multi-query logica als de GET preview
-    const subsectors = buildSearchQueries(sector, city, 99);
-    const selectedSet = selectedPlaceIds ? new Set(selectedPlaceIds) : null;
-    const seenPlaceIds = new Set<string>();
-    let allLeads: Awaited<ReturnType<typeof discoverLeads>>['leads'] = [];
-
-    for (const query of subsectors) {
-      if (allLeads.length >= count) break;
-      const result = await discoverLeads(query, 60, city);
-      for (const lead of result.leads) {
-        if (!seenPlaceIds.has(lead.placeId)) {
-          seenPlaceIds.add(lead.placeId);
-          if (!selectedSet || selectedSet.has(lead.placeId)) {
-            allLeads.push(lead);
-          }
-        }
-      }
-    }
-
-    const toImport = allLeads.slice(0, count);
+    const { sector, leads: toImport } = parsed.data;
 
     if (toImport.length === 0) {
       return NextResponse.json({ imported: 0, duplicates: 0, total: 0 });
     }
 
-    // Create import log
+    // Create import log VOOR de insert (was eerder NA de loop)
     const [importLog] = await db
       .insert(schema.importLogs)
       .values({
@@ -149,7 +143,7 @@ export async function POST(request: NextRequest) {
       country: 'BE' as const,
       name: lead.name,
       street: lead.address || null,
-      city: city,
+      city: lead.discoveredInCity,
       sector: sector,
       website: lead.website,
       phone: lead.phone,

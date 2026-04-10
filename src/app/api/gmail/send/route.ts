@@ -6,6 +6,7 @@ import * as schema from '@/lib/db/schema';
 import { isValidSession } from '@/lib/auth';
 import { rateLimit } from '@/lib/rate-limit';
 import { sendGmail } from '@/lib/gmail';
+import { autoTransitionOnOutreach } from '@/lib/pipeline-logic';
 
 const sendSchema = z.object({
   businessId: z.string().uuid(),
@@ -58,6 +59,9 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date(),
       })
       .where(eq(schema.leadPipeline.businessId, businessId));
+
+    // Auto-move van "Nieuw" naar "Gecontacteerd" bij eerste outreach
+    await autoTransitionOnOutreach(businessId, 'email');
 
     // Als het een draft was, markeer als verstuurd
     if (draftId) {
