@@ -1,10 +1,10 @@
 export const dynamic = 'force-dynamic';
 
 import Link from "next/link";
-import { Download, Globe, ArrowUpRight } from "lucide-react";
-import { eq, and, or, desc, asc, ilike, gte, lte, isNull, isNotNull, count } from "drizzle-orm";
+import { Download, Globe, ArrowUpRight, Zap } from "lucide-react";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
+import { eq, count } from "drizzle-orm";
 import { Header } from "@/components/layout/header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,13 @@ import { SmartImportButton } from "@/components/leads/smart-import-button";
 import { LeadFilters } from "@/components/leads/lead-filters";
 import { LeadActions } from "@/components/leads/lead-actions";
 import { InsightsWidget } from "@/components/ai/insights-widget";
-import { formatNumber } from "@/lib/utils";
 import { ITEMS_PER_PAGE } from "@/lib/constants";
+import {
+  buildColdLeadsWhere,
+  fetchColdLeads,
+  serializeColdLeadFilters,
+  type ColdLeadFilters,
+} from "@/lib/db/queries/cold-leads";
 
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -24,99 +29,24 @@ interface PageProps {
 export default async function LeadsPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
-  const country = (params.country as string) || undefined;
-  const province = (params.province as string) || undefined;
-  const status = (params.status as string) || undefined;
-  const sector = (params.sector as string) || undefined;
-  const search = (params.search as string) || undefined;
-  const naceCode = (params.naceCode as string) || undefined;
-  const hasWebsite = (params.hasWebsite as string) || undefined;
-  const imported = (params.imported as string) || undefined;
-  const sort = (params.sort as string) || "recent";
-  const order = (params.order as string) || (sort === "score" ? "desc" : "asc");
+  const filters: ColdLeadFilters = {
+    country: (params.country as string) || undefined,
+    province: (params.province as string) || undefined,
+    status: (params.status as string) || undefined,
+    sector: (params.sector as string) || undefined,
+    search: (params.search as string) || undefined,
+    naceCode: (params.naceCode as string) || undefined,
+    hasWebsite: (params.hasWebsite as string) || undefined,
+    imported: (params.imported as string) || undefined,
+    sort: (params.sort as string) || "recent",
+    order: (params.order as string) || undefined,
+  };
+
   const page = Math.max(1, parseInt((params.page as string) ?? "1", 10));
   const limit = ITEMS_PER_PAGE;
   const offset = (page - 1) * limit;
 
-  // Build WHERE conditions — Cold leads only (niet warm, niet blacklisted)
-  const conditions = [];
-  conditions.push(eq(schema.businesses.optOut, false));
-  conditions.push(eq(schema.businesses.blacklisted, false));
-  conditions.push(eq(schema.businesses.leadTemperature, 'cold'));
-
-  if (country) {
-    conditions.push(eq(schema.businesses.country, country as "BE" | "NL"));
-  }
-  if (province) {
-    conditions.push(eq(schema.businesses.province, province));
-  }
-  if (status) {
-    conditions.push(
-      eq(
-        schema.leadStatuses.status,
-        status as "new" | "contacted" | "replied" | "meeting" | "won" | "lost" | "disqualified"
-      )
-    );
-  }
-  if (sector) {
-    conditions.push(eq(schema.businesses.sector, sector));
-  }
-  if (imported) {
-    const now = new Date();
-    let since: Date;
-    if (imported === "today") {
-      since = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      conditions.push(gte(schema.businesses.createdAt, since));
-    } else if (imported === "week") {
-      since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      conditions.push(gte(schema.businesses.createdAt, since));
-    } else if (imported === "month") {
-      since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      conditions.push(gte(schema.businesses.createdAt, since));
-    } else if (imported === "older") {
-      since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      conditions.push(lte(schema.businesses.createdAt, since));
-    }
-  }
-  if (search) {
-    conditions.push(
-      or(
-        ilike(schema.businesses.name, "%" + search + "%"),
-        ilike(schema.businesses.city, "%" + search + "%")
-      )
-    );
-  }
-  if (naceCode) {
-    conditions.push(eq(schema.businesses.naceCode, naceCode));
-  }
-  if (hasWebsite === "true") {
-    conditions.push(isNotNull(schema.businesses.website));
-  } else if (hasWebsite === "false") {
-    conditions.push(isNull(schema.businesses.website));
-  }
-
-  const whereClause = and(...conditions);
-
-  const sortDirection = order === "asc" ? asc : desc;
-  let orderByColumn;
-  switch (sort) {
-    case "name":
-      orderByColumn = sortDirection(schema.businesses.name);
-      break;
-    case "city":
-      orderByColumn = sortDirection(schema.businesses.city);
-      break;
-    case "founded":
-      orderByColumn = sortDirection(schema.businesses.foundedDate);
-      break;
-    case "recent":
-      orderByColumn = sortDirection(schema.businesses.createdAt);
-      break;
-    case "score":
-    default:
-      orderByColumn = sortDirection(schema.leadScores.totalScore);
-      break;
-  }
+  const whereClause = buildColdLeadsWhere(filters);
 
   const [totalResult] = await db
     .select({ count: count() })
@@ -128,37 +58,12 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   const total = totalResult.count;
   const totalPages = Math.ceil(total / limit);
 
-  const data = await db
-    .select({
-      business: schema.businesses,
-      score: schema.leadScores,
-      status: schema.leadStatuses,
-      audit: schema.auditResults,
-    })
-    .from(schema.businesses)
-    .leftJoin(schema.leadScores, eq(schema.businesses.id, schema.leadScores.businessId))
-    .leftJoin(schema.leadStatuses, eq(schema.businesses.id, schema.leadStatuses.businessId))
-    .leftJoin(schema.auditResults, eq(schema.businesses.id, schema.auditResults.businessId))
-    .where(whereClause)
-    .orderBy(orderByColumn)
-    .limit(limit)
-    .offset(offset);
+  const data = await fetchColdLeads(filters, { limit, offset });
 
-  const filterParams: Record<string, string> = {};
-  if (country) filterParams.country = country;
-  if (province) filterParams.province = province;
-  if (status) filterParams.status = status;
-  if (sector) filterParams.sector = sector;
-  if (search) filterParams.search = search;
-  if (naceCode) filterParams.naceCode = naceCode;
-  if (hasWebsite) filterParams.hasWebsite = hasWebsite;
-  if (imported) filterParams.imported = imported;
-  if (sort && sort !== "recent") filterParams.sort = sort;
-  if (order && order !== "desc") filterParams.order = order;
-
-
+  const filterParams = serializeColdLeadFilters(filters);
   const exportParams = new URLSearchParams(filterParams);
   const exportUrl = "/api/export?" + exportParams.toString();
+  const triageUrl = "/leads/triage?" + exportParams.toString();
 
   return (
     <div>
@@ -168,6 +73,12 @@ export default async function LeadsPage({ searchParams }: PageProps) {
         actions={
           <div className="flex items-center gap-2">
             <SmartImportButton />
+            <Link href={triageUrl}>
+              <Button variant="primary" size="sm" disabled={total === 0}>
+                <Zap className="h-4 w-4" />
+                Work Mode ({total})
+              </Button>
+            </Link>
             <a href={exportUrl}>
               <Button variant="secondary" size="sm">
                 <Download className="h-4 w-4" />
@@ -180,16 +91,16 @@ export default async function LeadsPage({ searchParams }: PageProps) {
 
       <LeadFilters
         filters={{
-          country,
-          province,
-          status,
-          sector,
-          search,
-          naceCode,
-          hasWebsite,
-          imported,
-          sort,
-          order,
+          country: filters.country,
+          province: filters.province,
+          status: filters.status,
+          sector: filters.sector,
+          search: filters.search,
+          naceCode: filters.naceCode,
+          hasWebsite: filters.hasWebsite,
+          imported: filters.imported,
+          sort: filters.sort,
+          order: filters.order,
         }}
       />
 
