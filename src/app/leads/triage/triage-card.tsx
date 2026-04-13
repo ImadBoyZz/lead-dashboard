@@ -212,6 +212,7 @@ export function TriageCard({ lead, onPromote, onSkip, onBlacklist, busy }: Triag
           Contact
         </h2>
         <ContactEditor
+          key={business.id}
           leadId={business.id}
           email={business.email}
           phone={business.phone}
