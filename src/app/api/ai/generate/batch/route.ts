@@ -12,6 +12,9 @@ import { generateOutreachPrompt, type OutreachContext } from '@/lib/ai/prompts';
 import { logAIUsage } from '@/lib/ai/cost-tracker';
 import { ITEMS_PER_PAGE } from '@/lib/constants';
 
+// Hobby plan max = 60s, nodig voor sequentiële AI calls
+export const maxDuration = 60;
+
 const batchSchema = z.object({
   businessIds: z.array(z.string().uuid()).min(1).max(ITEMS_PER_PAGE),
   channel: z.enum(['email', 'phone']),
@@ -41,9 +44,13 @@ export async function POST(request: NextRequest) {
     let totalPromptTokens = 0;
     let totalCompletionTokens = 0;
     let count = 0;
+    const startTime = Date.now();
+    const TIME_LIMIT_MS = 50_000; // Stop 10s voor Vercel timeout
 
     // Sequentieel verwerken (rate limits)
     for (const businessId of businessIds) {
+      // Veiligheidscheck: stop voor timeout
+      if (Date.now() - startTime > TIME_LIMIT_MS) break;
       const business = await db.query.businesses.findFirst({
         where: eq(schema.businesses.id, businessId),
       });
