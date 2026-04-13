@@ -91,10 +91,28 @@ export async function POST(request: NextRequest) {
       kanaal: channel,
     };
 
-    // Genereer via AI
+    // Genereer via AI (met retry bij overloaded/transient errors)
     const { system, user } = generateOutreachPrompt(context);
     const provider = getAIProvider();
-    const response = await provider.generateText(system, user);
+
+    const MAX_RETRIES = 2;
+    let response;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        response = await provider.generateText(system, user);
+        break;
+      } catch (err: unknown) {
+        const status = (err as { status?: number }).status;
+        if (status === 529 && attempt < MAX_RETRIES) {
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+        throw err;
+      }
+    }
+    if (!response) {
+      return NextResponse.json({ error: 'AI API niet beschikbaar, probeer later opnieuw' }, { status: 503 });
+    }
 
     // Parse response
     let variants: { subject?: string; body: string }[];
@@ -103,8 +121,9 @@ export async function POST(request: NextRequest) {
       if (text.startsWith('```')) {
         text = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
       }
-      variants = JSON.parse(text);
-      if (!Array.isArray(variants) || variants.length === 0) {
+      const parsed = JSON.parse(text);
+      variants = Array.isArray(parsed) ? parsed : [parsed];
+      if (variants.length === 0) {
         throw new Error('Ongeldig AI antwoord');
       }
     } catch {

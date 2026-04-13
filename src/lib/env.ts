@@ -20,11 +20,11 @@ export const env = {
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
   // AI Provider configuratie
   AI_PROVIDER: (process.env.AI_PROVIDER ?? 'anthropic') as 'anthropic' | 'openai',
-  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? '',
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? '',
-  // Gmail OAuth
-  GMAIL_CLIENT_ID: process.env.GMAIL_CLIENT_ID ?? '',
-  GMAIL_CLIENT_SECRET: process.env.GMAIL_CLIENT_SECRET ?? '',
-  GMAIL_REFRESH_TOKEN: process.env.GMAIL_REFRESH_TOKEN ?? '',
-  GMAIL_SENDER_EMAIL: process.env.GMAIL_SENDER_EMAIL ?? '',
+  ANTHROPIC_API_KEY: (process.env.ANTHROPIC_API_KEY ?? '').trim(),
+  OPENAI_API_KEY: (process.env.OPENAI_API_KEY ?? '').trim(),
+  // Gmail OAuth (trim tegen trailing newlines uit Vercel env)
+  GMAIL_CLIENT_ID: (process.env.GMAIL_CLIENT_ID ?? '').trim(),
+  GMAIL_CLIENT_SECRET: (process.env.GMAIL_CLIENT_SECRET ?? '').trim(),
+  GMAIL_REFRESH_TOKEN: (process.env.GMAIL_REFRESH_TOKEN ?? '').trim(),
+  GMAIL_SENDER_EMAIL: (process.env.GMAIL_SENDER_EMAIL ?? '').trim(),
 } as const;
