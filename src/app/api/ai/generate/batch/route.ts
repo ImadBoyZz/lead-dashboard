@@ -12,8 +12,8 @@ import { generateOutreachPrompt, type OutreachContext } from '@/lib/ai/prompts';
 import { logAIUsage } from '@/lib/ai/cost-tracker';
 import { ITEMS_PER_PAGE } from '@/lib/constants';
 
-// Hobby plan max = 60s, nodig voor sequentiële AI calls
-export const maxDuration = 60;
+// Pro plan: ruim genoeg voor 25 sequentiële AI calls
+export const maxDuration = 300;
 
 const batchSchema = z.object({
   businessIds: z.array(z.string().uuid()).min(1).max(ITEMS_PER_PAGE),
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     let totalCompletionTokens = 0;
     let count = 0;
     const startTime = Date.now();
-    const TIME_LIMIT_MS = 50_000; // Stop 10s voor Vercel timeout
+    const TIME_LIMIT_MS = 280_000; // Stop 20s voor Vercel timeout
 
     // Sequentieel verwerken (rate limits)
     for (const businessId of businessIds) {
