@@ -72,8 +72,14 @@ export function ContactEditor({
   const [editing, setEditing] = useState<FieldKey | null>(null);
   const [saving, setSaving] = useState(false);
   const [value, setValue] = useState("");
+  const [localOverrides, setLocalOverrides] = useState<Partial<Record<FieldKey, string | null>>>({});
 
-  const current: Record<FieldKey, string | null> = { email, phone, website, facebook };
+  const current: Record<FieldKey, string | null> = {
+    email: localOverrides.email !== undefined ? localOverrides.email : email,
+    phone: localOverrides.phone !== undefined ? localOverrides.phone : phone,
+    website: localOverrides.website !== undefined ? localOverrides.website : website,
+    facebook: localOverrides.facebook !== undefined ? localOverrides.facebook : facebook,
+  };
 
   function startEdit(field: FieldKey) {
     setEditing(field);
@@ -89,11 +95,14 @@ export function ContactEditor({
     if (editing === null) return;
     setSaving(true);
     try {
-      await fetch(`/api/leads/${leadId}`, {
+      const res = await fetch(`/api/leads/${leadId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [editing]: value }),
       });
+      if (res.ok) {
+        setLocalOverrides((prev) => ({ ...prev, [editing]: value || null }));
+      }
       setEditing(null);
       setValue("");
       router.refresh();
