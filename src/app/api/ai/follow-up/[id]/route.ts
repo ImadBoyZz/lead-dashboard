@@ -12,6 +12,8 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+export const maxDuration = 30;
+
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
 

@@ -9,6 +9,8 @@ import { createAutoReminder } from '@/lib/auto-reminders';
 import { sendGmail } from '@/lib/gmail';
 import { env } from '@/lib/env';
 
+export const maxDuration = 120;
+
 const bulkApproveSchema = z.object({
   draftIds: z.array(z.string().uuid()).min(1),
 });

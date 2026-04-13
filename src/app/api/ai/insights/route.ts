@@ -8,6 +8,8 @@ import { getAIProvider } from '@/lib/ai/provider';
 import { generateInsightsPrompt, type InsightsData } from '@/lib/ai/prompts';
 import { logAIUsage } from '@/lib/ai/cost-tracker';
 
+export const maxDuration = 30;
+
 export async function GET(request: NextRequest) {
   if (!(await isValidSession(request))) {
     return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 });

@@ -10,6 +10,8 @@ import { getToneForNace } from '@/lib/ai/tone';
 import { generateOutreachPrompt, type OutreachContext } from '@/lib/ai/prompts';
 import { logAIUsage } from '@/lib/ai/cost-tracker';
 
+export const maxDuration = 30;
+
 const generateSchema = z.object({
   businessId: z.string().uuid(),
   channel: z.enum(['email', 'phone']),
