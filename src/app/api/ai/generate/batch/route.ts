@@ -10,9 +10,10 @@ import { getAIProvider } from '@/lib/ai/provider';
 import { getToneForNace } from '@/lib/ai/tone';
 import { generateOutreachPrompt, type OutreachContext } from '@/lib/ai/prompts';
 import { logAIUsage } from '@/lib/ai/cost-tracker';
+import { ITEMS_PER_PAGE } from '@/lib/constants';
 
 const batchSchema = z.object({
-  businessIds: z.array(z.string().uuid()).min(1).max(20),
+  businessIds: z.array(z.string().uuid()).min(1).max(ITEMS_PER_PAGE),
   channel: z.enum(['email', 'phone']),
   templateStyle: z.string().optional(),
 });
