@@ -385,7 +385,12 @@ export const outreachChannelEnum = pgEnum('outreach_channel', [
 export const priorityEnum = pgEnum('priority', ['low', 'medium', 'high', 'urgent']);
 
 // AI draft status enum
-export const draftStatusEnum = pgEnum('draft_status', ['pending', 'approved', 'rejected', 'sent']);
+// Fase 3: uitgebreid met send-pipeline states. Order:
+//   pending → approved → sending → sent | send_failed | bounced
+//   pending → rejected (human review)
+export const draftStatusEnum = pgEnum('draft_status', [
+  'pending', 'approved', 'rejected', 'sent', 'sending', 'send_failed', 'bounced',
+]);
 
 // Fase 3: Feedback loop enums
 export const rejectionReasonEnum = pgEnum('rejection_reason', [
