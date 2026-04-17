@@ -102,6 +102,67 @@ export function DraftApprovalBoard({ campaignId }: DraftApprovalBoardProps) {
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
   }
 
+  async function approveCurrent() {
+    if (!currentDraft || currentDraft.status !== "pending") return;
+    await fetch(`/api/ai/drafts/${currentDraft.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "approved" }),
+    });
+    handleStatusChange(currentDraft.id, "approved");
+    goNext();
+  }
+
+  async function rejectCurrent() {
+    if (!currentDraft || currentDraft.status !== "pending") return;
+    await fetch(`/api/ai/drafts/${currentDraft.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "rejected" }),
+    });
+    handleStatusChange(currentDraft.id, "rejected");
+    goNext();
+  }
+
+  // Keyboard shortcuts: j=next, k=prev, a=approve+next, r=reject+next, s=send
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      // Negeer shortcuts als user in een input/textarea aan het typen is
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      switch (e.key) {
+        case "j":
+          e.preventDefault();
+          goNext();
+          break;
+        case "k":
+          e.preventDefault();
+          goPrev();
+          break;
+        case "a":
+          e.preventDefault();
+          void approveCurrent();
+          break;
+        case "r":
+          e.preventDefault();
+          void rejectCurrent();
+          break;
+        case "s":
+          if (approvedCount > 0 && !sending) {
+            e.preventDefault();
+            void sendApproved();
+          }
+          break;
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, drafts, approvedCount, sending]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -136,6 +197,12 @@ export function DraftApprovalBoard({ campaignId }: DraftApprovalBoardProps) {
             {sending ? "Versturen..." : `Verstuur goedgekeurd (${approvedCount})`}
           </Button>
         )}
+        <div className="ml-auto text-xs text-muted hidden md:block">
+          <kbd className="rounded bg-white/80 border border-card-border px-1.5 py-0.5 font-mono">j</kbd>/<kbd className="rounded bg-white/80 border border-card-border px-1.5 py-0.5 font-mono">k</kbd> volgend/vorig
+          · <kbd className="rounded bg-white/80 border border-card-border px-1.5 py-0.5 font-mono">a</kbd> goedkeuren
+          · <kbd className="rounded bg-white/80 border border-card-border px-1.5 py-0.5 font-mono">r</kbd> afwijzen
+          · <kbd className="rounded bg-white/80 border border-card-border px-1.5 py-0.5 font-mono">s</kbd> verstuur
+        </div>
       </div>
 
       {/* Single draft view met navigatie */}

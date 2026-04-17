@@ -1,13 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Snowflake, Flame, KanbanSquare, Settings, FileText } from "lucide-react";
+import { Snowflake, Flame, KanbanSquare, Settings, FileText, Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Cold Leads", href: "/leads", icon: Snowflake },
   { name: "Warm Leads", href: "/warm", icon: Flame },
+  { name: "Review", href: "/review", icon: Inbox, badge: "pending" as const },
   { name: "Pipeline", href: "/pipeline", icon: KanbanSquare },
   { name: "Logs", href: "/logs", icon: FileText },
   { name: "Settings", href: "/settings", icon: Settings },
@@ -15,6 +17,24 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [pendingCount, setPendingCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchCount() {
+      try {
+        const res = await fetch('/api/ai/drafts/pending-count');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setPendingCount(data.pending ?? 0);
+      } catch {
+        // ignore — badge blijft dan leeg
+      }
+    }
+    fetchCount();
+    const id = setInterval(fetchCount, 60_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [pathname]);
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar text-sidebar-foreground flex flex-col z-40">
@@ -26,6 +46,7 @@ export function Sidebar() {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navigation.map((item) => {
           const isActive = pathname.startsWith(item.href);
+          const showBadge = item.badge === 'pending' && pendingCount !== null && pendingCount > 0;
           return (
             <Link
               key={item.href}
@@ -38,7 +59,12 @@ export function Sidebar() {
               )}
             >
               <item.icon className="h-4 w-4 shrink-0" />
-              {item.name}
+              <span className="flex-1">{item.name}</span>
+              {showBadge && (
+                <span className="inline-flex min-w-[1.5rem] h-5 items-center justify-center rounded-full bg-accent text-white text-xs font-semibold px-1.5">
+                  {pendingCount}
+                </span>
+              )}
             </Link>
           );
         })}
