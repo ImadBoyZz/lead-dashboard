@@ -1,7 +1,7 @@
 // Env validatie — crasht bij startup als vereiste vars ontbreken
 
 function requireEnv(name: string): string {
-  const value = process.env[name];
+  const value = process.env[name]?.trim();
   if (!value) {
     throw new Error(`Missing required environment variable: ${name}`);
   }
