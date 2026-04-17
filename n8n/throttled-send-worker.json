@@ -1,0 +1,124 @@
+{
+  "name": "Throttled Send Worker",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "minutes", "minutesInterval": 5 }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Every 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Alleen uitvoeren op werkdagen tussen 09:00 en 17:00 Europe/Brussels.\n// Gebruik Intl om DST automatisch te respecteren.\nconst now = new Date();\nconst parts = new Intl.DateTimeFormat('nl-BE', {\n  timeZone: 'Europe/Brussels',\n  weekday: 'short',\n  hour: '2-digit',\n  hour12: false,\n}).formatToParts(now);\n\nconst dow = parts.find(p => p.type === 'weekday')?.value ?? '';\nconst hour = parseInt(parts.find(p => p.type === 'hour')?.value ?? '0', 10);\n\nconst isWeekday = ['ma', 'di', 'wo', 'do', 'vr'].includes(dow);\nconst inWindow = hour >= 9 && hour < 17;\n\nif (!isWeekday || !inWindow) {\n  return [];  // stuur workflow niet door, skip tick\n}\nreturn [{ json: { weekday: dow, hour, ok: true } }];"
+      },
+      "id": "window-gate",
+      "name": "Window gate (Mon-Fri 09-17 Europe/Brussels)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LEAD_DASHBOARD_URL}}/api/daily-batch/to-send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "send-call",
+      "name": "POST /to-send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LEAD_DASHBOARD_BEARER",
+          "name": "Lead Dashboard Bearer"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{$json.sent}}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check-sent",
+      "name": "Was a draft sent?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Optional: log voor debug / cost summary\nconst data = $input.first().json;\nreturn [{ json: { ts: new Date().toISOString(), messageId: data.messageId, draftId: data.draftId, businessId: data.businessId, sentToday: data.sentToday, maxToday: data.maxToday } }];"
+      },
+      "id": "log-sent",
+      "name": "Log sent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Op skipped (paused, cap reached, no queue): niks loggen, gewoon wachten\nreturn [];"
+      },
+      "id": "log-skip",
+      "name": "Silent skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 400]
+    }
+  ],
+  "connections": {
+    "schedule": { "main": [[{ "node": "window-gate", "type": "main", "index": 0 }]] },
+    "window-gate": { "main": [[{ "node": "send-call", "type": "main", "index": 0 }]] },
+    "send-call": { "main": [[{ "node": "check-sent", "type": "main", "index": 0 }]] },
+    "check-sent": {
+      "main": [
+        [{ "node": "log-sent", "type": "main", "index": 0 }],
+        [{ "node": "log-skip", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "_comments": {
+    "env_vars": {
+      "LEAD_DASHBOARD_URL": "Bv. https://lead-dashboard-git-full-automation-imads-projects-746a9425.vercel.app (zonder trailing slash)"
+    },
+    "credentials": {
+      "LEAD_DASHBOARD_BEARER": {
+        "type": "httpHeaderAuth",
+        "name": "Lead Dashboard Bearer",
+        "headerName": "Authorization",
+        "headerValue": "Bearer <N8N_WEBHOOK_SECRET>"
+      }
+    },
+    "setup": [
+      "1. Importeer dit JSON bestand in n8n",
+      "2. Maak Credential 'Lead Dashboard Bearer' aan (HTTP Header Auth), header 'Authorization', value 'Bearer <N8N_WEBHOOK_SECRET waarde uit Vercel env>'",
+      "3. Zet env var LEAD_DASHBOARD_URL op n8n instance (Settings → Environment Variables)",
+      "4. Activate de workflow. De Window Gate zorgt dat calls buiten 9-17u werkdag Europe/Brussels niet doorgaan."
+    ]
+  }
+}
