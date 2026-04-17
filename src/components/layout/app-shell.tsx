@@ -5,9 +5,10 @@ import { Sidebar } from './sidebar';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isLoginPage = pathname === '/login';
+  const isBareLayoutPage =
+    pathname === '/login' || pathname.startsWith('/unsubscribe');
 
-  if (isLoginPage) {
+  if (isBareLayoutPage) {
     return <>{children}</>;
   }
 
