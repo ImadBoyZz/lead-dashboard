@@ -1,0 +1,104 @@
+{
+  "name": "Morning Qualification Batch",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 6 * * 1-5" }
+          ]
+        },
+        "triggerAtMinute": 0
+      },
+      "id": "cron-06",
+      "name": "Cron 06:00 Mon-Fri",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.LEAD_DASHBOARD_URL}}/api/daily-batch/qualification-queue?limit=50",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": { "timeout": 15000 }
+      },
+      "id": "fetch-queue",
+      "name": "Fetch qualification queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": { "id": "LEAD_DASHBOARD_BEARER", "name": "Lead Dashboard Bearer" }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "leads",
+        "options": { "destinationFieldName": "lead" }
+      },
+      "id": "split-leads",
+      "name": "Split per lead",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "id": "batch",
+      "name": "Batch 5-parallel",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LEAD_DASHBOARD_URL}}/api/enrich/full/{{$json.lead.id}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000,
+          "retry": { "onError": "retryOnCode", "maxRetries": 2, "retryDelay": 2000 }
+        }
+      },
+      "id": "enrich-full",
+      "name": "POST /enrich/full/{id}",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300],
+      "credentials": {
+        "httpHeaderAuth": { "id": "LEAD_DASHBOARD_BEARER", "name": "Lead Dashboard Bearer" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregeer resultaten voor log / debug\nconst results = $input.all();\nconst ok = results.filter(r => r.json?.status === 'completed' || r.json?.status === 'disqualified_early').length;\nconst failed = results.length - ok;\nreturn [{ json: { processed: results.length, ok, failed, at: new Date().toISOString() } }];"
+      },
+      "id": "aggregate",
+      "name": "Aggregate + log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "cron-06": { "main": [[{ "node": "fetch-queue", "type": "main", "index": 0 }]] },
+    "fetch-queue": { "main": [[{ "node": "split-leads", "type": "main", "index": 0 }]] },
+    "split-leads": { "main": [[{ "node": "batch", "type": "main", "index": 0 }]] },
+    "batch": { "main": [[{ "node": "enrich-full", "type": "main", "index": 0 }]] },
+    "enrich-full": { "main": [[{ "node": "aggregate", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "_comments": {
+    "doel": "Start om 06:00 werkdagen. Vraagt qualification-queue op (50 leads), itereert en roept /enrich/full per lead. 5 parallel per batch. Retry 2x bij 5xx.",
+    "env_vars": { "LEAD_DASHBOARD_URL": "zonder trailing slash" },
+    "credentials": { "LEAD_DASHBOARD_BEARER": "HTTP Header Auth met Authorization: Bearer <N8N_WEBHOOK_SECRET>" },
+    "timeout_note": "enrich/full kan 20-40s duren per lead door Opus tiebreaker + Firecrawl scrapes. Timeout op 120s om safe te zijn."
+  }
+}

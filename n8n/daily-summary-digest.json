@@ -1,0 +1,80 @@
+{
+  "name": "Daily Summary Digest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 18 * * 1-5" }
+          ]
+        },
+        "triggerAtMinute": 0
+      },
+      "id": "cron-18",
+      "name": "Cron 18:00 Mon-Fri",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.LEAD_DASHBOARD_URL}}/api/daily-batch/summary",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": { "timeout": 30000 }
+      },
+      "id": "fetch-summary",
+      "name": "Fetch summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": { "id": "LEAD_DASHBOARD_BEARER", "name": "Lead Dashboard Bearer" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Bouw een Telegram-vriendelijke Markdown digest.\nconst s = $input.first().json;\nconst lines = [];\nlines.push(`*Lead Dashboard — ${s.date}*`);\nlines.push('');\nif (s.paused) lines.push(`🛑 *PAUZE*: ${s.pauseReason}`);\nlines.push(`📧 Verstuurd: *${s.sent.total}* (delivered ${s.sent.delivered}, bounced ${s.sent.bounced}, klacht ${s.sent.complained})`);\nif (s.sent.bouncedPct > 2) lines.push(`⚠️  Bounce rate ${s.sent.bouncedPct}% (>2% = alert)`);\nif (s.sent.complainedPct > 0.1) lines.push(`⚠️  Complaint rate ${s.sent.complainedPct}% (>0.1% = alert)`);\nlines.push(`📋 Queue: ${s.queue.pending} pending review, ${s.queue.approved} ready-to-send`);\nlines.push(`💰 Kost: €${s.cost.totalEur.toFixed(3)} / €${s.cost.budgetEur} (${s.cost.pct}%)`);\nlines.push(`🌡️ Warmup: ${s.warmup.stage} (${s.warmup.maxSendsToday}/dag)`);\nif (s.topRejectReasonsLast7Days?.length) {\n  lines.push('');\n  lines.push('*Top reject redenen (7d):*');\n  for (const r of s.topRejectReasonsLast7Days) lines.push(`  • ${r.reason}: ${r.count}`);\n}\nreturn [{ json: { text: lines.join('\\n'), parse_mode: 'Markdown', summary: s } }];"
+      },
+      "id": "format",
+      "name": "Format digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$env.TELEGRAM_CHAT_ID}}",
+        "text": "={{$json.text}}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "telegram",
+      "name": "Send to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [900, 300],
+      "credentials": {
+        "telegramApi": { "id": "TELEGRAM_BOT", "name": "Telegram Bot" }
+      }
+    }
+  ],
+  "connections": {
+    "cron-18": { "main": [[{ "node": "fetch-summary", "type": "main", "index": 0 }]] },
+    "fetch-summary": { "main": [[{ "node": "format", "type": "main", "index": 0 }]] },
+    "format": { "main": [[{ "node": "telegram", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "_comments": {
+    "doel": "Elke werkdag om 18:00 een digest naar Imad's Telegram sturen met sent/rejected/cost/queue/warmup metrics + top reject redenen laatste 7d.",
+    "env_vars": {
+      "LEAD_DASHBOARD_URL": "zonder trailing slash",
+      "TELEGRAM_CHAT_ID": "Imad's Telegram chat ID (via @userinfobot te vinden)"
+    },
+    "credentials": {
+      "TELEGRAM_BOT": "Telegram Bot API token (via @BotFather)",
+      "LEAD_DASHBOARD_BEARER": "HTTP Header Auth met Authorization: Bearer <N8N_WEBHOOK_SECRET>"
+    },
+    "alternatief_zonder_telegram": "Vervang Telegram node door Gmail/SMTP node en stuur naar bardid.imad@gmail.com"
+  }
+}
