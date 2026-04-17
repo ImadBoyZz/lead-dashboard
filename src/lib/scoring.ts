@@ -1,4 +1,5 @@
 import { getSectorTier, getSectorMedianReviews, isZichtbaarheidsSector } from './nace-config';
+import { isChainDisqualifier, type ChainClassification } from './classify/franchise';
 
 // ── Interfaces ────────────────────────────────────────
 
@@ -24,6 +25,9 @@ export interface ScoreInput {
     googleBusinessUpdatedAt: Date | null;
     hasGoogleAds: boolean | null;
     hasSocialMediaLinks: boolean | null;
+    // Fase 1: franchise/keten classificatie
+    chainClassification?: ChainClassification | null;
+    chainConfidence?: number | null;
   };
   audit: {
     websiteHttpStatus: number | null;
@@ -149,6 +153,23 @@ export function computeScore(input: ScoreInput): ScoreResult {
 
   if (business.googleBusinessStatus === 'CLOSED_PERMANENTLY') {
     return { totalScore: 0, disqualified: true, disqualifyReason: 'Permanent gesloten (Google)', breakdown: {}, maturityCluster: 'D', maturityMultiplier: 0 };
+  }
+
+  // Fase 1: keten/franchise/corporate = geen lokale beslisser, geen prospect
+  // Alleen disqualificeren als classifier confident is (>=0.7), anders "twijfel" queue
+  if (
+    business.chainClassification &&
+    isChainDisqualifier(business.chainClassification) &&
+    (business.chainConfidence ?? 0) >= 0.7
+  ) {
+    return {
+      totalScore: 0,
+      disqualified: true,
+      disqualifyReason: `${business.chainClassification === 'franchise' ? 'Franchise' : business.chainClassification === 'chain' ? 'Keten' : 'Corporate'} — geen lokale beslisser`,
+      breakdown: {},
+      maturityCluster: 'D',
+      maturityMultiplier: 0,
+    };
   }
 
   const hasGBP = business.hasGoogleBusinessProfile === true;

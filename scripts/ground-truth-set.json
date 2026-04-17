@@ -1,0 +1,39 @@
+{
+  "_meta": {
+    "description": "30 handgelabelde Vlaamse bedrijven voor franchise/keten classifier accuracy baseline.",
+    "source": "Imad Bardid + publieke Google Places data, 2026-04-17",
+    "note": "Dit is de baseline voor Fase 1 layers 1+2 (patterns + Places signalen). Fase 2 breidt uit met LLM. Website verdict wordt ingevuld wanneer /enrich/website klaar is."
+  },
+  "cases": [
+    { "name": "McDonald's Aalst Centrum", "googleReviewCount": 1820, "hasGoogleBusinessProfile": true, "website": "https://www.mcdonalds.com/be", "expectedChainClassification": "chain", "notes": "Pattern-match moet pakken op 'McDonald'" },
+    { "name": "Burger King Gent Zuid", "googleReviewCount": 980, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "chain" },
+    { "name": "KFC Antwerpen Centraal", "googleReviewCount": 1240, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "chain" },
+    { "name": "Quick Leuven", "googleReviewCount": 520, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "chain", "notes": "Word boundary test: mag niet matchen op 'Quick Garage BV'" },
+    { "name": "Quick Garage BV", "googleReviewCount": 45, "hasGoogleBusinessProfile": true, "website": "https://quickgarage.be", "expectedChainClassification": "unknown", "notes": "Tricky: 'Quick' als eerste woord, maar dit is onafhankelijk garage. contains_word met \\b zou niet matchen op de hele naam als 'Quick Garage'... dit test of pattern match te breed is" },
+    { "name": "Carrefour Express Aalst", "googleReviewCount": 340, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "corporate" },
+    { "name": "Delhaize Ledeberg", "googleReviewCount": 620, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "corporate" },
+    { "name": "Lidl Hasselt Zuid", "googleReviewCount": 890, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "corporate" },
+    { "name": "Spar Gentbrugge", "googleReviewCount": 215, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "chain" },
+    { "name": "TotalEnergies Erpe-Mere", "googleReviewCount": 78, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "corporate" },
+    { "name": "Shell Wetteren", "googleReviewCount": 132, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "corporate" },
+    { "name": "Q8 Dendermonde", "googleReviewCount": 95, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "corporate" },
+    { "name": "Euromaster Aalst", "googleReviewCount": 240, "hasGoogleBusinessProfile": true, "website": "https://www.euromaster.be", "expectedChainClassification": "chain" },
+    { "name": "Carglass Gent", "googleReviewCount": 410, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "corporate" },
+    { "name": "Proximus Shop Wetteren", "googleReviewCount": 88, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "corporate" },
+    { "name": "Brico Aalst", "googleReviewCount": 560, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "corporate" },
+    { "name": "Hubo Lokeren", "googleReviewCount": 310, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "chain" },
+    { "name": "IKEA Zaventem", "googleReviewCount": 15200, "hasGoogleBusinessProfile": true, "website": "https://www.ikea.com/be", "expectedChainClassification": "corporate" },
+    { "name": "Randstad Aalst", "googleReviewCount": 64, "hasGoogleBusinessProfile": true, "website": "https://www.randstad.be", "expectedChainClassification": "corporate" },
+    { "name": "Frituur De Gouden Kroon", "googleReviewCount": 185, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "independent", "notes": "Layer 2 valt 'unknown' terug (independent vereist website+reviews+GBP — hier geen website)" },
+    { "name": "Frituur Smulpaap Erembodegem", "googleReviewCount": 72, "hasGoogleBusinessProfile": true, "website": "https://frituursmulpaap.be", "expectedChainClassification": "unknown", "notes": "72 reviews, onder de 'independent' drempel van 50. Layer 2 geeft unknown → Layer 3 nodig" },
+    { "name": "Restaurant 't Oud Stadhuis", "googleReviewCount": 312, "hasGoogleBusinessProfile": true, "website": "https://oudstadhuis.be", "expectedChainClassification": "independent", "notes": "GBP + website + >50 reviews + <500 = 'independent' confidence 0.7" },
+    { "name": "Kapsalon Elegance Bernadette", "googleReviewCount": 128, "hasGoogleBusinessProfile": true, "website": "https://elegance-bernadette.be", "expectedChainClassification": "independent" },
+    { "name": "Garage Van den Broeck Aalst", "googleReviewCount": 210, "hasGoogleBusinessProfile": true, "website": "https://garagevdbroeck.be", "expectedChainClassification": "independent" },
+    { "name": "Franck Provost Sint-Niklaas", "googleReviewCount": 95, "hasGoogleBusinessProfile": true, "website": null, "expectedChainClassification": "chain" },
+    { "name": "Bakkerij Luc Aalst", "googleReviewCount": 420, "hasGoogleBusinessProfile": true, "website": "https://bakkerijluc.be", "expectedChainClassification": "independent" },
+    { "name": "AXA Bank Wetteren Kantoor Peeters", "googleReviewCount": 42, "hasGoogleBusinessProfile": true, "website": "https://axa-peeters.be", "expectedChainClassification": "corporate", "notes": "AXA franchise-makelaar. Pattern match op 'AXA'" },
+    { "name": "Pizzeria Da Luigi", "googleReviewCount": 645, "hasGoogleBusinessProfile": true, "website": "https://daluigi.be", "expectedChainClassification": "chain", "notes": "645 reviews > 500 = Layer 2 classificeert als 'chain' — mogelijk false positive voor een succesvol onafhankelijk italiaans restaurant, maar dit test de drempel" },
+    { "name": "Tuincentrum De Dag", "googleReviewCount": 89, "hasGoogleBusinessProfile": true, "website": "https://tuindedag.be", "expectedChainClassification": "unknown", "notes": "Klein bedrijf, geen pattern match, geen sterke Places signalen — Layer 3 nodig" },
+    { "name": "Boekhouder Dewit & Partners", "googleReviewCount": 12, "hasGoogleBusinessProfile": true, "website": "https://dewit-partners.be", "expectedChainClassification": "unknown", "notes": "Weinig reviews, unknown blijven tot LLM" }
+  ]
+}

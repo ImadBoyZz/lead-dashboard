@@ -6,6 +6,8 @@ import * as schema from '@/lib/db/schema';
 import { discoverLeads, buildSearchQueries, detectBatchDuplicates } from '@/lib/places-discovery';
 import { computeScore } from '@/lib/scoring';
 import { rateLimit } from '@/lib/rate-limit';
+import { matchKboEnterprise, type KboMatchResult } from '@/lib/kbo/matcher';
+import { extractPostcodeFromAddress } from '@/lib/kbo/normalize';
 
 // GET — Preview: discover leads from Google Places, deduplicate, return without saving
 export async function GET(request: NextRequest) {
@@ -178,6 +180,41 @@ export async function POST(request: NextRequest) {
         insertedBusinesses.map((b) => [b.registryId, b.id])
       );
 
+      // KBO enrichment pass — plan ik-heb-eigenlijk-een-merry-oasis.md §Chunk 3.
+      // Match elke nieuw ingevoegde lead tegen staging, persisteer KBO-velden, en
+      // gebruik ze in computeScore zodat maturity clusters/IT-disqualifier direct werken.
+      const kboByBusinessId = new Map<string, KboMatchResult | null>();
+      const now = new Date();
+      await Promise.all(
+        toImport.map(async (lead) => {
+          const businessId = idByPlaceId.get(lead.placeId);
+          if (!businessId) return;
+          const postcode = extractPostcodeFromAddress(lead.address);
+          const match = await matchKboEnterprise({ name: lead.name, postalCode: postcode });
+          kboByBusinessId.set(businessId, match);
+          if (match) {
+            await db
+              .update(schema.businesses)
+              .set({
+                kboEnterpriseNumber: match.enterpriseNumber,
+                kboMatchConfidence: match.confidence,
+                kboMatchedAt: now,
+                foundedDate: match.foundedDate,
+                naceCode: match.naceCode,
+                legalForm: match.legalForm,
+                postalCode: postcode ?? undefined,
+                updatedAt: now,
+              })
+              .where(eq(schema.businesses.id, businessId));
+          } else {
+            await db
+              .update(schema.businesses)
+              .set({ kboMatchedAt: now, updatedAt: now, postalCode: postcode ?? undefined })
+              .where(eq(schema.businesses.id, businessId));
+          }
+        }),
+      );
+
       const statusValues: { businessId: string; status: 'new' }[] = [];
       const scoreValues: {
         businessId: string;
@@ -195,12 +232,14 @@ export async function POST(request: NextRequest) {
 
         statusValues.push({ businessId, status: 'new' });
 
+        const kboMatch = kboByBusinessId.get(businessId);
+
         const scoreResult = computeScore({
           business: {
             website: lead.website,
-            foundedDate: null,
-            naceCode: null,
-            legalForm: null,
+            foundedDate: kboMatch?.foundedDate ?? null,
+            naceCode: kboMatch?.naceCode ?? null,
+            legalForm: kboMatch?.legalForm ?? null,
             email: null,
             phone: lead.phone,
             googleRating: lead.rating,

@@ -8,8 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "npx tsx src/lib/db/seed.ts",
-    "kbo-import": "npx tsx scripts/kbo-import.ts",
-    "kbo-staging": "npx tsx scripts/kbo-staging-import.ts"
+    "kbo-import": "npx tsx scripts/kbo-import.ts ./kbo-data",
+    "kbo-backfill": "npx tsx scripts/kbo-backfill.ts",
+    "kbo-measure": "npx tsx scripts/measure-kbo-match-rate.ts",
+    "kbo-refresh": "npx tsx scripts/kbo-monthly-refresh.ts --skip-download"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.86.1",

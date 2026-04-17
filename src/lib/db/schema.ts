@@ -21,6 +21,7 @@ export const countryEnum = pgEnum('country', ['BE', 'NL']);
 export const dataSourceEnum = pgEnum('data_source', [
   'google_places',
   'manual',
+  'kbo_bulk',
 ]);
 
 export const leadStatusEnum = pgEnum('lead_status', [
@@ -48,6 +49,47 @@ export const emailStatusEnum = pgEnum('email_status', [
   'soft_bounced',
   'complained',
   'invalid',
+]);
+
+// Fase 1: keten/franchise classificatie
+export const chainClassificationEnum = pgEnum('chain_classification', [
+  'independent',
+  'franchise',
+  'chain',
+  'corporate',
+  'unknown',
+]);
+
+// Fase 1: website "oudheid" verdict
+export const websiteVerdictEnum = pgEnum('website_verdict', [
+  'none',
+  'parked',
+  'outdated',
+  'acceptable',
+  'modern',
+]);
+
+// Fase 1: email bron
+export const emailSourceEnum = pgEnum('email_source', [
+  'google_places',
+  'firecrawl',
+  'manual',
+  'none',
+]);
+
+// Fase 1: franchise pattern match type
+export const franchisePatternMatchTypeEnum = pgEnum('franchise_pattern_match_type', [
+  'exact',
+  'contains_word',
+  'regex',
+]);
+
+// Fase 1: dead-letter enrichment step
+export const dlqEnrichmentStepEnum = pgEnum('dlq_enrichment_step', [
+  'qualify',
+  'website',
+  'email',
+  'generate',
 ]);
 
 // ── Businesses ─────────────────────────────────────────
@@ -108,6 +150,22 @@ export const businesses = pgTable(
     // Fase 0: email deliverability status
     emailStatus: emailStatusEnum('email_status').default('unverified'),
     emailStatusUpdatedAt: timestamp('email_status_updated_at'),
+    emailSource: emailSourceEnum('email_source').default('none'),
+    // Fase 1: keten/franchise classificatie
+    chainClassification: chainClassificationEnum('chain_classification').default('unknown'),
+    chainConfidence: real('chain_confidence'),
+    chainClassifiedAt: timestamp('chain_classified_at'),
+    chainReason: text('chain_reason'),
+    // Fase 1: website verdict (combinatie van PageSpeed/SSL/visueel)
+    websiteVerdict: websiteVerdictEnum('website_verdict'),
+    websiteAgeEstimate: integer('website_age_estimate'),
+    websiteVerdictAt: timestamp('website_verdict_at'),
+    // Fase 1: AVG legitimate interest basis per lead (overschrijft legalBasis indien NACE-specifiek)
+    legitimateInterestBasis: text('legitimate_interest_basis'),
+    // KBO Fast-Path enrichment (plan: ik-heb-eigenlijk-een-merry-oasis.md)
+    kboEnterpriseNumber: text('kbo_enterprise_number'),
+    kboMatchConfidence: real('kbo_match_confidence'),
+    kboMatchedAt: timestamp('kbo_matched_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -123,6 +181,9 @@ export const businesses = pgTable(
     index('businesses_lead_temperature_idx').on(table.leadTemperature),
     index('businesses_blacklisted_idx').on(table.blacklisted),
     index('businesses_created_at_idx').on(table.createdAt),
+    index('businesses_chain_classification_idx').on(table.chainClassification),
+    index('businesses_website_verdict_idx').on(table.websiteVerdict),
+    index('businesses_kbo_enterprise_number_idx').on(table.kboEnterpriseNumber),
   ],
 );
 
@@ -585,4 +646,129 @@ export const systemSettings = pgTable('system_settings', {
   value: jsonb('value').notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   updatedBy: text('updated_by'),
+});
+
+// ── Fase 1: Franchise Patterns (CRUD via admin UI later) ──────────
+
+export const franchisePatterns = pgTable('franchise_patterns', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  pattern: text('pattern').notNull(),
+  matchType: franchisePatternMatchTypeEnum('match_type').notNull(),
+  classification: chainClassificationEnum('classification').notNull().default('franchise'),
+  reason: text('reason'),
+  enabled: boolean('enabled').default(true).notNull(),
+  addedAt: timestamp('added_at').defaultNow().notNull(),
+  addedBy: text('added_by'),
+}, (table) => [
+  index('franchise_patterns_enabled_idx').on(table.enabled),
+  uniqueIndex('franchise_patterns_pattern_unique').on(table.pattern, table.matchType),
+]);
+
+// ── Fase 1: Daily Batches (orchestratie-log + warmup/cost tracking) ──
+
+export const dailyBatches = pgTable('daily_batches', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  runDate: date('run_date').notNull(),
+  leadsProcessed: integer('leads_processed').default(0).notNull(),
+  qualified: integer('qualified').default(0).notNull(),
+  rejected: integer('rejected').default(0).notNull(),
+  costEur: real('cost_eur').default(0).notNull(),
+  durationSeconds: integer('duration_seconds'),
+  errorLog: jsonb('error_log').default(sql`'[]'::jsonb`),
+  maxSendsToday: integer('max_sends_today'),
+  actualSent: integer('actual_sent').default(0).notNull(),
+  deliverabilityScore: real('deliverability_score'),
+  startedAt: timestamp('started_at').defaultNow().notNull(),
+  completedAt: timestamp('completed_at'),
+}, (table) => [
+  uniqueIndex('daily_batches_run_date_unique').on(table.runDate),
+  index('daily_batches_run_date_idx').on(table.runDate),
+]);
+
+// ── Fase 1: Dead-Letter Queue (per-step failure retry) ────────────
+
+export const dlqEnrichments = pgTable('dlq_enrichments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  businessId: uuid('business_id').notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
+  step: dlqEnrichmentStepEnum('step').notNull(),
+  error: text('error').notNull(),
+  errorDetail: jsonb('error_detail'),
+  attemptCount: integer('attempt_count').default(1).notNull(),
+  lastAttemptAt: timestamp('last_attempt_at').defaultNow().notNull(),
+  nextRetryAt: timestamp('next_retry_at'),
+  resolvedAt: timestamp('resolved_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('dlq_enrichments_business_idx').on(table.businessId),
+  index('dlq_enrichments_step_idx').on(table.step),
+  index('dlq_enrichments_next_retry_idx').on(table.nextRetryAt),
+  index('dlq_enrichments_resolved_idx').on(table.resolvedAt),
+]);
+
+// ── Fase 1: Ground-Truth Labels (handgelabelde set voor accuracy meting) ──
+
+export const groundTruthLabels = pgTable('ground_truth_labels', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  businessId: uuid('business_id').notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
+  expectedChainClassification: chainClassificationEnum('expected_chain_classification').notNull(),
+  expectedWebsiteVerdict: websiteVerdictEnum('expected_website_verdict'),
+  notes: text('notes'),
+  labeledAt: timestamp('labeled_at').defaultNow().notNull(),
+  labeledBy: text('labeled_by').default('imad').notNull(),
+}, (table) => [
+  uniqueIndex('ground_truth_business_unique').on(table.businessId),
+]);
+
+// ── Fase 1: Relations ─────────────────────────────────
+
+export const dlqEnrichmentsRelations = relations(dlqEnrichments, ({ one }) => ({
+  business: one(businesses, {
+    fields: [dlqEnrichments.businessId],
+    references: [businesses.id],
+  }),
+}));
+
+export const groundTruthLabelsRelations = relations(groundTruthLabels, ({ one }) => ({
+  business: one(businesses, {
+    fields: [groundTruthLabels.businessId],
+    references: [businesses.id],
+  }),
+}));
+
+// ── KBO Lookup Table (Fast-Path enrichment) ───────────────────────────
+// Eén gedenormaliseerde tabel ipv 4 staging tabellen om Neon 512MB quota te respecteren.
+// Pre-joined tijdens import. Read-only, maandelijks refreshen via cron.
+// Plan: ik-heb-eigenlijk-een-merry-oasis.md §Quota fix.
+
+export const kboLookup = pgTable('kbo_lookup', {
+  enterpriseNumber: text('enterprise_number').primaryKey(),
+  denomination: text('denomination').notNull(),
+  normalizedDenomination: text('normalized_denomination').notNull(),
+  zipcode: text('zipcode'),
+  municipality: text('municipality'),
+  province: text('province'),
+  naceCode: text('nace_code'),
+  naceVersion: text('nace_version'),
+  juridicalForm: text('juridical_form'),
+  juridicalSituation: text('juridical_situation'),
+  typeOfEnterprise: text('type_of_enterprise'),
+  startDate: date('start_date'),
+}, (table) => [
+  // Composite index matcht exact op (normalized_name, zipcode) — fast-path query
+  index('kbo_lookup_match_idx').on(table.normalizedDenomination, table.zipcode),
+  index('kbo_lookup_zipcode_idx').on(table.zipcode),
+]);
+
+export const kboSnapshot = pgTable('kbo_snapshot', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  snapshotDate: date('snapshot_date').notNull(),
+  importedAt: timestamp('imported_at').defaultNow().notNull(),
+  enterprisesCount: integer('enterprises_count').default(0).notNull(),
+  denominationsCount: integer('denominations_count').default(0).notNull(),
+  activitiesCount: integer('activities_count').default(0).notNull(),
+  addressesCount: integer('addresses_count').default(0).notNull(),
+  durationSeconds: integer('duration_seconds'),
+  notes: text('notes'),
 });
