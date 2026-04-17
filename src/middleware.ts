@@ -9,6 +9,8 @@ const PUBLIC_PATHS = [
   '/api/audit',       // n8n webhook (eigen Bearer auth)
   '/api/reminders/due', // n8n webhook (eigen Bearer auth)
   '/api/agent',         // managed agent endpoints (eigen Bearer auth)
+  '/api/qualify',       // Fase 2: per-lead classify (sessie OF Bearer)
+  '/api/enrich',        // Fase 2: per-lead enrichment (sessie OF Bearer)
   '/api/gmail/callback', // Google OAuth callback
   '/api/unsubscribe',    // HMAC-signed token
   '/unsubscribe',        // landing page (valideert token zelf)
