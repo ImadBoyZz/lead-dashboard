@@ -10,6 +10,9 @@ const PUBLIC_PATHS = [
   '/api/reminders/due', // n8n webhook (eigen Bearer auth)
   '/api/agent',         // managed agent endpoints (eigen Bearer auth)
   '/api/gmail/callback', // Google OAuth callback
+  '/api/unsubscribe',    // HMAC-signed token
+  '/unsubscribe',        // landing page (valideert token zelf)
+  '/api/inbound/resend', // Resend webhook (svix signature)
 ];
 
 export async function middleware(request: NextRequest) {

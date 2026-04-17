@@ -40,6 +40,16 @@ export const importStatusEnum = pgEnum('import_status', [
   'failed',
 ]);
 
+export const emailStatusEnum = pgEnum('email_status', [
+  'unverified',
+  'mx_valid',
+  'smtp_valid',
+  'hard_bounced',
+  'soft_bounced',
+  'complained',
+  'invalid',
+]);
+
 // ── Businesses ─────────────────────────────────────────
 
 export const businesses = pgTable(
@@ -91,6 +101,13 @@ export const businesses = pgTable(
     legalBasis: text('legal_basis').default('legitimate_interest_b2b'),
     optOut: boolean('opt_out').default(false).notNull(),
     optOutAt: timestamp('opt_out_at'),
+    optOutReason: text('opt_out_reason'),
+    // Fase 0: AVG paper trail voor cold outreach verantwoording
+    sourceUrl: text('source_url'),
+    sourceCapturedAt: timestamp('source_captured_at'),
+    // Fase 0: email deliverability status
+    emailStatus: emailStatusEnum('email_status').default('unverified'),
+    emailStatusUpdatedAt: timestamp('email_status_updated_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -367,10 +384,18 @@ export const outreachLog = pgTable('outreach_log', {
   aiGenerated: boolean('ai_generated').default(false),
   draftId: uuid('draft_id'),
   gmailThreadId: text('gmail_thread_id'),
+  // Fase 0: Resend message tracking + unsubscribe
+  resendMessageId: text('resend_message_id'),
+  unsubscribeToken: text('unsubscribe_token'),
+  deliveryStatus: text('delivery_status'),
+  deliveredAt: timestamp('delivered_at'),
+  bouncedAt: timestamp('bounced_at'),
+  complainedAt: timestamp('complained_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
   index('outreach_log_business_idx').on(table.businessId),
   index('outreach_log_contacted_at_idx').on(table.contactedAt),
+  index('outreach_log_resend_message_idx').on(table.resendMessageId),
 ]);
 
 // ── Fase 3: Reminders & Templates Enums ───────────────
@@ -552,3 +577,12 @@ export const scoringFeedbackRelations = relations(scoringFeedback, ({ one }) => 
     references: [businesses.id],
   }),
 }));
+
+// ── Fase 0: System Settings (kill-switch, warmup, budget) ─────────
+
+export const systemSettings = pgTable('system_settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  updatedBy: text('updated_by'),
+});

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
 import { BlacklistTable } from "./blacklist-table";
+import { OutreachSettings } from "./outreach-settings";
 import {
   Database,
   CheckCircle2,
@@ -92,6 +93,8 @@ export default async function SettingsPage() {
       <Header title="Instellingen" />
 
       <div className="space-y-6">
+        <OutreachSettings />
+
         {/* Import Status */}
         <Card title="Import Status" description="Laatste 5 imports">
           {imports.length === 0 ? (
