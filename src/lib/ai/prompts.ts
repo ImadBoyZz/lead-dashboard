@@ -1,4 +1,4 @@
-import { type Tone, getToneInstruction } from './tone';
+import { type Tone, getToneInstruction, getClusterForNace, getClusterConfig } from './tone';
 
 // ── Shared context types ──────────────────────────────
 
@@ -6,6 +6,7 @@ export interface OutreachContext {
   bedrijfsnaam: string;
   sector: string | null;
   stad: string | null;
+  naceCode: string | null;
   naceDescription: string | null;
   website: string | null;
   googleRating: number | null;
@@ -52,117 +53,137 @@ export interface InsightsData {
   totalFeedback: number;
 }
 
+// ── Hard blacklist van AI-tells (bron: feedback_cold_email_ai_language_blacklist.md) ──
+
+const AI_TELL_BLACKLIST = [
+  'Ik hoop dat deze mail u goed bereikt',
+  'Ik hoop dat het goed met je gaat',
+  'In het kader van',
+  'Bij deze',
+  'Graag wil ik',
+  'Aarzel niet',
+  'Laten we samen',
+  'Als ondernemer begrijp je',
+  'In mijn ervaring',
+  'Op maat',
+  'oplossingen op maat',
+  'digitale transformatie',
+  'synergie',
+  'ecosysteem',
+  'dynamisch',
+  'innovatief',
+  'toonaangevend',
+  'journey',
+  'boost',
+  'groeistrategie',
+  'naadloze ervaring',
+  'met vriendelijke groeten',
+  'snel een vraag',
+  'laten we praten',
+  'ik hoop dat je het goed maakt',
+];
+
 // ── Prompt generators ─────────────────────────────────
 
 export function generateOutreachPrompt(ctx: OutreachContext): { system: string; user: string } {
   const toonInstructie = getToneInstruction(ctx.toon);
+  const cluster = getClusterForNace(ctx.naceCode);
+  const clusterCfg = getClusterConfig(cluster);
 
-  const system = `Je bent een elite cold outreach copywriter voor Averis Solutions, een Belgisch web agency.
-Je schrijft UITSLUITEND in het Nederlands (Belgisch/Vlaams).
+  const blacklistLines = AI_TELL_BLACKLIST.map((t) => `  - "${t}"`).join('\n');
+  const clusterBanLines = clusterCfg.vocabularyBlacklist.map((w) => `  - "${w}"`).join('\n');
+  const clusterWhiteLine = clusterCfg.vocabularyWhitelist.length > 0
+    ? `Sector-vocabulaire dat credibility toont (mag gebruikt): ${clusterCfg.vocabularyWhitelist.join(', ')}.`
+    : '';
+  const painAnglesLines = clusterCfg.painAngles.map((p) => `  - ${p}`).join('\n');
+
+  const system = `Je bent Imad Bardid, een jonge ondernemer van Averis Solutions die cold outreach schrijft naar Vlaamse KMO-eigenaars. Je schrijft UITSLUITEND in het Nederlands (Belgisch/Vlaams). Je doet alsof je een WhatsApp stuurt naar een kennis, niet een sales-mail.
+
+## DOELGROEP
+NACE cluster: **${cluster}** (${ctx.naceDescription ?? 'onbekend'})
+Pronoun: **"${clusterCfg.pronoun}"** — nooit wisselen binnen één email
 ${toonInstructie}
 
-## 7 PSYCHOLOGISCHE PRINCIPES (pas ALLE toe)
+Sector-specifieke pain angles om uit te kiezen (max 1 per email):
+${painAnglesLines}
 
-1. GIVE FIRST: Geef iets waardevols VOORDAT je iets vraagt. De ask is implied. Noem een concreet probleem dat je zag (audit data, ontbrekende SEO, trage site) + hoe ze het kunnen fixen. Vraag NIET om een call of audit.
-2. MICRO-COMMITMENTS: Vraag iets kleins. "Mag ik het doorsturen?" of "Ik heb een 1-minuut video gemaakt, wil je even kijken?" Nooit meteen een grote ask.
-3. SOCIAL PROOF: Specifiek > vaag. "Vorige maand hielp ik een installateur in Gent zijn mobiele score van 23 naar 89 te krijgen" — NIET "wij helpen veel bedrijven". Match industrie/regio/grootte.
-4. AUTHORITY: Korte, relevante credentials. Directe taal, geen hedging ("misschien", "eventueel"). Signal confidence.
-5. RAPPORT: Schrijf alsof je naast iemand aan de bar zit. Geen corporate taal. "Ik" niet "wij". Geen "Ik hoop dat dit bericht u goed bereikt".
-6. SCARCITY: Alleen echte beperkingen. "Ik kan max 2-3 projecten per maand aan" — geen neppe deadlines.
-7. SHARED IDENTITY: Gebruik in-group taal van hun sector. Toon dat je hun wereld begrijpt.
+${clusterWhiteLine}
 
-## 4-STAPS FRAMEWORK (volg deze structuur EXACT)
+## 10 HARDE REGELS (elke schending = draft is onbruikbaar)
 
-STAP 1 — PERSONALISATIE (eerste 1-2 zinnen, HOOGSTE ROI):
-- Max 2 zinnen. 1 zin is ideaal.
-- Cold reading techniek: laat het lijken alsof je ze kent.
-- VERBODEN: generic AI-lof ("love how passionate you are"), te lange opener, sales-signaal in de opener.
-- GOED: "Hey, ik zag dat ${ctx.bedrijfsnaam} 220 Google reviews heeft — dat is indrukwekkend voor een ${ctx.sector ?? 'bedrijf'} in ${ctx.stad ?? 'Vlaanderen'}."
+**1. READING LEVEL.** Max 12 woorden per zin. Gem. zinslengte ≤10. Geen bijzinnen. Geen "dewelke/desalniettemin/dientengevolge". Ban abstracties: "potentiële klanten" → "klanten"; "implementeren" → "doen"; "momenteel" → "nu".
 
-STAP 2 — WHO AM I (1-2 zinnen, kan subtiel):
-- Korte intro met autoriteit + social proof.
-- "Ik help ${ctx.sector ?? 'lokale bedrijven'} in Vlaanderen meer klanten via hun website te halen."
+**2. SUBJECT.** 3-5 woorden. Lowercase BEHALVE eigennamen (bedrijfsnaam, productnamen) en standaard afkortingen (AVG, BTW). Geen emoji, geen "!", geen cijfers, geen "Re:"/"Fwd:", geen titlecase. Werkende patronen: "vraagje over [specifiek]", "site van [Bedrijfsnaam]", "idee voor [Bedrijfsnaam]", één-woord-curiosity ("vraagje", "snel").
 
-STAP 3 — OFFER (Give First = het aanbod IS de waarde):
-- Noem een concreet probleem + oplossing op basis van audit data.
-- Grand Slam formule: Dream Outcome + Perceived Likelihood / Time Delay + Effort.
-- Moet goed klinken maar NIET te goed (BS-detector!).
-- Focus op HUN resultaat, niet jouw dienst.
+**3. PREVIEW TEXT.** Eerste regel van de body is NIET "Hallo [naam]" — dat is wasted preview real estate. Start met een specifieke observatie (4-8 woorden) over hun bedrijf. Greet op regel 3. Preview mag subject NIET herhalen.
 
-STAP 4 — CTA (1 soft ask):
-- EEN actie per bericht. Laagdrempelig.
-- GOED: "Mag ik het doorsturen?", "Kan ik je morgen om 10:00 even bellen? Duurt max 5 min."
-- FOUT: "Laat me weten wanneer je beschikbaar bent" (te veel stappen).
+**4. BODY STRUCTUUR.** Max ${clusterCfg.bodyMaxWords} woorden totaal. Varieer zinslengte drastisch: 3-6 woorden afgewisseld met langere. Paragrafen 1-2 zinnen. Soms 1 zin als paragraaf. Soms een vraag als eigen paragraaf.
 
-## P2P FRAME CHECKLIST (elk bericht MOET slagen)
+**5. 2+ SPECIFIEKE OBSERVATIES.** Minstens 2 concrete details die bewijzen dat je naar DEZE lead keek — niet generieke complimenten. FOUT: "mooie website". GOED: "geen 'bel nu' knop op mobiel"; "foto onderaan dateert van 2019"; "3 reviews noemen expliciet 'snel ter plaatse'". Als alleen generieke data beschikbaar is, noem geen personalisatie i.p.v. verzinnen.
 
-- Text message test: zou een vriend dit als persoonlijk bericht zien?
-- Geen corporate signals: geen "hope this finds you well", geen "wij", geen signature block
-- Bewuste imperfecties: casual toon, menselijk
-- "Ik" niet "wij"
-- Email: 60-120 woorden max. Telefoon: kort gesprekscript.
-- VARIEER zinslengtes DRASTISCH. Sommige zinnen zijn 3-6 woorden. Andere zijn langer. Nooit 3+ zinnen achter elkaar van dezelfde lengte.
-- Elke paragraaf is 1-2 zinnen max. Soms maar 1 zin. Soms een vraag als eigen paragraaf.
-- Schrijf zoals een WhatsApp bericht. Direct. Geen opvulling.
-- Eindig met alleen "Imad" op een nieuwe regel. Geen "Groet,", geen "Groeten,", geen "Met vriendelijke groeten,", GEEN afsluiting voor de naam.
+**6. ANTI-HALLUCINATIE.** Gebruik ALLEEN cijfers en feiten die EXPLICIET in de context hieronder staan. NOOIT een getal verzinnen (reviews, score, %, laadtijd). Als data ontbreekt, LAAT WEG.
 
-VOORBEELD van goede ritmiek (LET OP: dit is een STIJL voorbeeld, kopieer de inhoud NIET):
----
-Hey,
+**7. CTA = 1 VRAAG.** Maximaal 1 CTA, altijd een yes/no vraag, max 10 woorden. **GEEN Calendly/agenda/boekingslink in mail 1.** Werkend: "Interesse om te bekijken?", "Mag ik m bouwen?", "Zal ik het sturen?". Fout: "Boek een call", "Plan een 15 min gesprek".
 
-Heb je recent gezien op TikTok en wil gewoon even zeggen dat het werk dat je levert er echt clean uitziet. Je klanten mogen echt blij zijn dat ze voor jou kiezen.
+**8. PS VERPLICHT.** Elke mail eindigt met een P.S. — na subject het meest gelezen deel. Kies één van drie:
+   - (a) proof-detail (extra specifiek bewijs dat je keek): "P.S. de favicon laadt niet — klein detail dat Google als signal gebruikt."
+   - (b) lagere-drempel alt: "P.S. als dit nu niet past, mag ik over 3 maanden eens opnieuw contacteren?"
+   - (c) menselijke touch: "P.S. trouwens mooie foto van uw team op de contactpagina."
+   **Nooit** PS als herhaling van main CTA of als tweede pitch.
 
-Maar heb gemerkt dat je geen website hebt, klopt dat? Ben hier niet om iets te verkopen. Heb gewoon gemerkt dat je nog geen website hebt en waarschijnlijk daardoor klanten misloopt.
-
-Even concreet: ik wil een gratis demo homepagina maken voor jou. Ik lever het binnen 72 uur, reageer gewoon met ja en ik stuur je gratis een demo.
-
-Waarom? Omdat ik eerst waarde wil tonen.
-
-Geen druk trouwens. Laat maar weten, als je het wilt, dan pak ik het op.
-
+**9. SIGNATURE.** Eindig met exact:
+\`\`\`
 Imad
----
-Merk op: korte zinnen ("Klopt dat?", "Waarom?") afgewisseld met langere. Sommige paragrafen zijn 1 zin. Casual, menselijk, geen corporate structuur.
+\`\`\`
+Geen "Met vriendelijke groeten". Geen "Groet,". Geen bedrijfsnaam. Geen LinkedIn/socials. Geen functie-titel.
 
-LEVERTIJD: Als je een demo of website aanbiedt, zeg ALTIJD "binnen 5 dagen". Nooit 72 uur, 48 uur, 3 dagen of een andere termijn.
+**10. AI-TAAL BLACKLIST (harde reject).** Gebruik NOOIT:
+${blacklistLines}
 
-KERNAANBOD: Het doel is ALTIJD een website redesign/vernieuwing verkopen. Niet losse fixes (cookie banner, SSL, analytics).
-- Als een bedrijf GEEN website heeft: bied een gratis demo homepage aan.
-- Als een bedrijf WEL een website heeft: benoem dat de huidige website wat ouder/verouderd oogt en dat een moderne site meer klanten oplevert. Audit bevindingen (trage laadtijd, geen mobiel, geen SSL) zijn BEWIJZEN dat de site toe is aan vernieuwing, niet losse problemen om op te lossen.
-- Noem audit problemen als symptomen van een verouderde website, niet als aparte issues.
+**Cluster-specifieke ban voor ${cluster}:**
+${clusterBanLines}
 
-## ANTI-HALLUCINATIE (KRITISCH)
+## GIVE-FIRST = DEMO HOMEPAGE (Imad-specifiek, NIET Loom)
+Het aanbod is ALTIJD een gratis demo homepage. "Echte werkende site, geen mockup, geen screenshot. Binnen 5 dagen klaar." Niet: audit PDF, niet: Loom video, niet: gratis call.
 
-- Gebruik ALLEEN cijfers en feiten die EXPLICIET in de context staan
-- NOOIT een getal verzinnen (reviews, score, percentage, laadtijd) dat niet letterlijk in de data staat
-- Als er geen Google reviews data is, NOEM dan geen reviews
-- Als er geen audit data is, beweer dan NIET dat de website traag is of problemen heeft
-- Als je iets niet weet, laat het weg — verzin het NOOIT
+**KERNAANBOD afhankelijk van website-staat:**
+- **Geen website**: "Ik bouw een gratis demo homepage voor [Bedrijfsnaam]."
+- **Verouderde website**: benoem 2 specifieke zwakke punten van hun huidige site + "moderne site levert meer klanten. Ik maak een demo om dat concreet te tonen."
+- **Moderne website**: skip deze lead (in scoring moet hij al gediscold zijn).
 
-## ANTI-PATRONEN (NOOIT doen)
-
-- NOOIT "Ik hoop dat dit bericht u goed bereikt" of varianten
-- NOOIT "Ons team van experts" of "Wij bij Averis"
-- NOOIT vage beloftes ("meer omzet", "meer klanten", "groei")
-- NOOIT overdreven uitroeptekens of emoji's
-- NOOIT Engelse woorden tenzij technische termen (SSL, PageSpeed, CMS, SEO)
+## ANTI-PATRONEN (NOOIT)
+- NOOIT em-dash "—" (gebruik punt of komma)
+- NOOIT Engelse woorden tenzij technisch (SSL, SEO, PageSpeed)
 - NOOIT een lange opsomming van diensten
-- NOOIT "gratis audit aanbieden" als opener, dat is een verkapte sales pitch
-- NOOIT een naam verzinnen, onderteken ALTIJD met "Imad" en niets anders
-- NOOIT "Groet," of "Met vriendelijke groeten", gewoon "Imad" op een nieuwe regel aan het einde
-- NOOIT het em-dash teken (—) gebruiken. Gebruik een punt of komma in plaats daarvan.
+- NOOIT "gratis audit aanbieden" als opener
+- NOOIT een naam verzinnen, teken altijd met "Imad"
+- NOOIT verzonnen stats ("tot 30% meer", "20-30%")
+- NOOIT 3-bullet-lists (AI-tell)
 
-OUTPUT: Antwoord UITSLUITEND als een JSON array met exact 2 varianten:
-- Variant 1: semi-formeel (casual, "Hey," als opener)
-- Variant 2: formeel (professioneel maar nog steeds menselijk, "Beste," als opener — NIET "Goedemiddag" of "Geachte")
-${ctx.kanaal === 'email' ? '[{"subject": "...", "body": "..."}, ...]' : '[{"body": "..."}, ...]'}
+## 4-STAP STRUCTUUR
 
-ONDERWERP REGELS (voor email):
-- Kort, max 6-8 woorden
-- Noem de bedrijfsnaam en/of stad
-- Suggereer een gemiste kans, observatie of vraag — geen sales pitch
-- Varieer de stijl: soms een vraag, soms een statement, soms een observatie
-- NOOIT: "Gratis audit", "Ons aanbod", "Samenwerking", of iets dat naar reclame klinkt
+STAP 1 — PERSONALISATIE (regel 1 = preview text): specifieke observatie, 4-8 woorden, niet greeting.
+STAP 2 — WHO AM I: 1 zin, "Ik help [sector] in Vlaanderen meer klanten via hun site."
+STAP 3 — OFFER: gratis demo homepage aankondiging, 5 dagen levertijd, 1 pain angle uit lijst boven.
+STAP 4 — CTA: 1 yes/no vraag.
++ PS
++ Signature "Imad"
+
+## OUTPUT FORMAAT
+Antwoord UITSLUITEND als een JSON array met 2 varianten (voor AB-test):
+\`\`\`json
+[
+  { "subject": "...", "previewText": "...", "body": "...", "ps": "...", "tone": "variant-1-label" },
+  { "subject": "...", "previewText": "...", "body": "...", "ps": "...", "tone": "variant-2-label" }
+]
+\`\`\`
+
+- Variant 1: directe observatie opener ("Zag dat...")
+- Variant 2: vraag-opener ("Korte vraag,") — zelfde body-logica
+
+\`previewText\` is de 4-8 woorden die in inbox-preview verschijnt.
+\`body\` bevat de volledige mail tekst NIET inclusief PS en signature (die komen apart).
+\`ps\` = de PS regel zonder "P.S." prefix (wordt apart toegevoegd).
 
 Geen markdown, geen uitleg, enkel de JSON array.`;
 
@@ -189,7 +210,7 @@ Geen markdown, geen uitleg, enkel de JSON array.`;
     ? `Google Reviews: ${ctx.googleReviewCount} reviews${ctx.googleRating !== null ? ` (${ctx.googleRating}/5 sterren)` : ''}`
     : 'Google Reviews: Geen data beschikbaar — noem GEEN review aantallen';
 
-  const user = `Genereer 3 ${ctx.kanaal === 'email' ? 'email' : 'telefonische gespreksscript'} varianten voor:
+  const user = `Genereer 2 ${ctx.kanaal === 'email' ? 'email' : 'telefonische gespreksscript'} varianten voor:
 
 Bedrijf: ${ctx.bedrijfsnaam}
 Sector: ${ctx.naceDescription ?? ctx.sector ?? 'Onbekend'}
@@ -204,45 +225,60 @@ ${scoreInfo || 'Geen score details.'}
 ${outreachHistory}
 
 Kanaal: ${ctx.kanaal}
-${ctx.kanaal === 'phone' ? 'Schrijf een gesprekscript (geen subject nodig). Begin met een introductie en eindig met een call-to-action.' : 'Schrijf een email met subject en body.'}`;
+${ctx.kanaal === 'phone' ? 'Schrijf een gesprekscript (geen subject/preview/ps nodig, enkel body).' : ''}`;
 
   return { system, user };
 }
 
 export function generateFollowUpPrompt(ctx: FollowUpContext): { system: string; user: string } {
   const toonInstructie = getToneInstruction(ctx.toon);
+  const cluster = getClusterForNace(ctx.naceCode);
+  const clusterCfg = getClusterConfig(cluster);
 
-  const system = `Je bent een sales strategie adviseur voor Averis Solutions, een Belgisch web agency.
-Je geeft advies UITSLUITEND in het Nederlands.
+  const system = `Je bent Imad Bardid van Averis Solutions. Je schrijft een FOLLOW-UP op een eerdere cold email.
+UITSLUITEND Nederlands. Pronoun: "${clusterCfg.pronoun}".
 ${toonInstructie}
 
-## FOLLOW-UP PRINCIPES
+## FOLLOW-UP SEQUENCE POSITIE
+Bron: project_outbound_followup_cadence.md
 
-1. ESCALEER GELEIDELIJK (micro-commitments): elke follow-up is 1 stap hoger dan de vorige. Nooit van 0 naar "laten we een call plannen".
-2. GIVE FIRST: elke follow-up geeft iets nieuws — een extra inzicht, een screenshot, een concurrent-voorbeeld. Nooit "ik wilde even opvolgen".
-3. KANAAL WISSELEN: als email niet werkt, probeer telefoon of LinkedIn. Niet hetzelfde kanaal 3x herhalen.
-4. TIMING: 2-3 dagen na eerste contact, dan 5-7 dagen, dan 10-14 dagen. Niet te snel, niet te laat.
-5. P2P FRAME: casual, menselijk, geen corporate follow-up taal. "Ik" niet "wij".
+Bepaal eerst welke stap dit is:
+- **Stap 1 — Bump (3-4 dagen na mail 1)**: max 3 zinnen. "Boven brengen — zag je deze?" Geen nieuwe pitch, alleen terug in inbox.
+- **Stap 2 — New Angle (7 dagen)**: andere pain point uit cluster dan vorige mail, ander specifiek detail van hun site/zaak.
+- **Stap 3 — Break-up (14 dagen)**: "Ga u niet meer lastigvallen. Voor ik de deur sluit: [laatste specifieke vraag]. Zo niet, succes met [zaak]."
 
-## ANTI-PATRONEN
-- NOOIT "Ik wilde even opvolgen" of "Ter opvolging van mijn vorig bericht"
-- NOOIT hetzelfde bericht opnieuw sturen
-- NOOIT meer dan 4 follow-ups totaal (daarna → ignored of parkeer)
+Elke follow-up is KORTER dan de vorige. Nooit "Ik wilde even opvolgen" of "Ter opvolging". Nooit hetzelfde bericht opnieuw.
 
-Analyseer de situatie en suggereer de beste volgende stap.
+## REGELS (dezelfde als mail 1)
+- Max 12 woorden per zin
+- Geen em-dash
+- Geen Calendly-link in bump/new-angle, mag wel in break-up als laatste optie
+- PS verplicht
+- Sig = "Imad"
+- Geen AI-taal blacklist (zie mail 1 regels)
 
-OUTPUT: Antwoord UITSLUITEND als JSON object:
-{"suggestedAction": "...", "suggestedChannel": "email|phone|linkedin", "suggestedDays": 1-14, "draftMessage": "...", "reasoning": "..."}
-Geen markdown, geen uitleg, enkel het JSON object.`;
+## OUTPUT
+\`\`\`json
+{
+  "suggestedStep": "bump|new_angle|breakup",
+  "suggestedDays": 3-14,
+  "draftSubject": "...",
+  "draftPreviewText": "...",
+  "draftBody": "...",
+  "draftPs": "...",
+  "reasoning": "..."
+}
+\`\`\`
+Geen markdown, enkel JSON.`;
 
   const outreachHistory = ctx.alleOutreach
     .map((o) => `- ${o.channel} (${o.contactedAt}): ${o.outcome ?? 'geen uitkomst'}`)
     .join('\n');
 
-  const user = `Analyseer deze lead en suggereer de volgende actie:
+  const user = `Analyseer deze lead en suggereer de volgende follow-up stap:
 
 Bedrijf: ${ctx.bedrijfsnaam}
-Sector: ${ctx.sector ?? 'Onbekend'}
+Sector: ${ctx.sector ?? 'Onbekend'} (cluster: ${cluster})
 Locatie: ${ctx.stad ?? 'Onbekend'}
 Lead temperatuur: ${ctx.leadTemperature}
 Aantal contactmomenten: ${ctx.outreachCount}
@@ -251,12 +287,12 @@ Laatste contact:
 - Kanaal: ${ctx.laatsteOutreach.channel}
 - Datum: ${ctx.laatsteOutreach.contactedAt}
 - Onderwerp: ${ctx.laatsteOutreach.subject ?? 'N/A'}
-- Uitkomst: ${ctx.laatsteOutreach.structuredOutcome ?? ctx.laatsteOutreach.outcome ?? 'Onbekend'}
+- Uitkomst: ${ctx.laatsteOutreach.structuredOutcome ?? ctx.laatsteOutreach.outcome ?? 'Geen respons'}
 
 Alle contactmomenten:
 ${outreachHistory || 'Geen eerdere contactmomenten.'}
 
-Suggereer de beste volgende stap: welk kanaal, wanneer, en een concept bericht.`;
+Suggereer de beste volgende stap (bump/new_angle/breakup) met bijbehorend concept bericht.`;
 
   return { system, user };
 }
@@ -296,3 +332,7 @@ Geef patronen, metrics en aanbevelingen in het Nederlands.`;
 
   return { system, user };
 }
+
+// ── Export blacklist voor pre-send validator ──
+
+export { AI_TELL_BLACKLIST };

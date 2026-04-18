@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
       bedrijfsnaam: business.name,
       sector: business.sector,
       stad: business.city,
+      naceCode: business.naceCode,
       naceDescription: business.naceDescription,
       website: business.website,
       googleRating: business.googleRating,
@@ -114,8 +115,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'AI API niet beschikbaar, probeer later opnieuw' }, { status: 503 });
     }
 
-    // Parse response
-    let variants: { subject?: string; body: string }[];
+    // Parse response — nieuwe structuur: { subject, previewText, body, ps, tone }
+    let variants: { subject?: string; previewText?: string; body: string; ps?: string; tone?: string }[];
     try {
       let text = response.text.trim();
       if (text.startsWith('```')) {
@@ -133,6 +134,17 @@ export async function POST(request: NextRequest) {
       }, { status: 502 });
     }
 
+    // PS appenden aan body + signature "Imad" toevoegen
+    function composeBody(v: { body: string; ps?: string }): string {
+      const parts = [v.body.trim()];
+      if (v.ps && v.ps.trim()) {
+        const ps = v.ps.trim().startsWith('P.S.') ? v.ps.trim() : `P.S. ${v.ps.trim()}`;
+        parts.push(ps);
+      }
+      parts.push('Imad');
+      return parts.join('\n\n');
+    }
+
     // Log usage
     await logAIUsage({
       endpoint: '/api/ai/generate',
@@ -146,8 +158,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       variants: variants.slice(0, 2).map((v, i) => ({
         subject: v.subject ?? null,
-        body: v.body,
-        tone: i === 0 ? 'semi-formal' : 'formal',
+        previewText: v.previewText ?? null,
+        body: composeBody(v),
+        tone: v.tone ?? (i === 0 ? 'semi-formal' : 'formal'),
         variantIndex: i,
       })),
       usage: response.usage,
