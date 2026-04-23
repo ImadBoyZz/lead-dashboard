@@ -2,13 +2,14 @@ import { getSetting } from '@/lib/settings/system-settings';
 
 /**
  * Warmup ramp voor cold outreach reputatie-opbouw.
- * Progressie: week 1 = 10/dag, week 2 = 25/dag, week 3 = 50/dag, daarna 100/dag.
- * Als er geen warmup_start_date gezet is, wordt er conservatief 10/dag aangehouden.
+ * Week 0 = 5/dag (pre-warmup), week 1 = 10/dag, week 2 = 25/dag, week 3 = 50/dag, daarna 100/dag.
+ * Als er geen warmup_start_date gezet is, wordt er conservatief 5/dag aangehouden.
  */
 const WARMUP_STAGES: Array<{ untilDay: number; max: number }> = [
-  { untilDay: 7, max: 10 },
-  { untilDay: 14, max: 25 },
-  { untilDay: 21, max: 50 },
+  { untilDay: 7, max: 5 },
+  { untilDay: 14, max: 10 },
+  { untilDay: 21, max: 25 },
+  { untilDay: 28, max: 50 },
   { untilDay: Infinity, max: 100 },
 ];
 
@@ -68,7 +69,11 @@ export async function getWarmupStatus(now: Date = new Date()): Promise<{
 
   const day = daysBetween(startDate, now);
   const stageLabel =
-    day < 7 ? 'week_1' : day < 14 ? 'week_2' : day < 21 ? 'week_3' : 'full_capacity';
+    day < 7 ? 'week_0'
+    : day < 14 ? 'week_1'
+    : day < 21 ? 'week_2'
+    : day < 28 ? 'week_3'
+    : 'full_capacity';
 
   return {
     startDate,
