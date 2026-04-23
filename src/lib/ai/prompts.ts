@@ -178,12 +178,33 @@ Kies ALLEEN een CTA die past bij wat de mail al gegeven heeft. Niet iets apart i
 
   if (variant === 'concurrent_vergelijking') {
     return {
-      giveFirstSection: `## GIVE-FIRST = ANONIEME BENCHMARK (variant: concurrent_vergelijking)
-Het aanbod is een korte anonieme vergelijking met een paar vergelijkbare bedrijven uit hun sector/regio op 3-5 simpele dimensies (snelheid, mobile UX, vindbaarheid, content-frequentie). NOOIT namen noemen, niet in deze mail, niet bij navraag, niet ooit. De waarde zit in zien hoe ze relatief scoren.
+      giveFirstSection: `## GIVE-FIRST = OBSERVATIES IN DE MAIL ZELF (variant: concurrent_vergelijking)
+
+**KERNPRINCIPE (cold-email-copywriting-cheatsheet.md):** de waarde wordt in DEZE mail GELEVERD, niet beloofd. De lead moet na het lezen al iets weten zonder te antwoorden. Dit is give-first zoals de cheatsheet het bedoelt ("zag X bij soortgelijke spelers, **deze site valt op deze punten op**"), niet "mag ik de vergelijking sturen?" in vermomming.
+
+**BENCHMARK-FRAMING (anoniem):** de mail positioneert zichzelf tegenover 3-4 vergelijkbare bedrijven uit hun sector/regio. NOOIT namen noemen, niet in deze mail, niet bij navraag, niet ooit. De waarde zit in 2-3 concrete bevindingen die opvielen bij DEZE site tijdens de vergelijking.
 
 PRIVACY-CRITICAL: schrijf de mail zo dat het anonieme karakter expliciet blijkt: "anoniem", "vergelijkbare bedrijven", "soortgelijke spelers", "in de regio", "lokaal". Zo voorkomen we dat de lead vraagt "wie zijn die concurrenten?". En als ze het wel vragen, noemt Imad nog steeds geen namen.
 
-LEAN START fulfillment-flag: Imad bouwt de benchmark zelf op basis van Google PageSpeed + manuele observatie van 3-5 concurrenten. Geen automated tool. Vermijd beloftes als "PDF rapport" of "uitgebreide analyse". Werkende CTA-vormen voor stap 4 (pronoun-neutraal, AI past pronoun aan via de DOELGROEP regel): "interesse om te zien waar de site staat?", "mag ik het sturen?", "interesse in de vergelijking?".
+LEAN START fulfillment-flag: Imad bouwt een eventueel uitgebreider benchmark-gesprek NA een positieve reply. In deze mail GEEN belofte van "PDF rapport", "uitgebreide analyse" of "volledige vergelijking sturen". De mail LEVERT de 2-3 punten al — de reply is dan over wat de lead er mee wil doen.
+
+### PRIORITEIT #1 — CMS CHECK BIJ LEGACY BUILDER
+
+Als \`detectedCms\` = Mobirise / Wix / oude WordPress (<5.x) / Joomla / statische HTML → neem dit ALTIJD mee als eerste van de 2-3 bevindingen, met framing: "site draait nog op [CMS]. die bouwer is achterhaald en scoort zwak op snelheid en SEO." Mag NIET in de opener staan (die blijft benchmark-framing, zie hieronder), maar moet EERSTE bevinding in de body zijn.
+
+### Geef 2-3 bevindingen in de mail zelf
+
+Elk met een korte, menselijke framing. Formule per bevinding: "zag X. [soms: fix of context.]" (1 zin observatie, optioneel 1 zin context). Niet beloven om een lijst later te sturen.
+
+**FIXES/OBSERVATIES PER AUDIT-BEVINDING** (pronoun-neutraal, AI past 'u'/'je' aan):
+- **CMS = Mobirise/Wix/oude WordPress/Joomla/statisch HTML:** "site draait nog op [CMS]. die bouwer is achterhaald en scoort zwak op snelheid en SEO."
+- Geen SSL: "site staat nog op http (geen slotje in de browser). hosting kan dat meestal gratis activeren."
+- Geen Google Analytics: "geen bezoekers-tracking. Google Analytics installeren is gratis en eenvoudig."
+- Niet mobile responsive: "site schaalt niet op iPhone. meestal een kleine aanpassing in de header-code."
+- Geen structured data: "Google toont geen reviews-sterren in zoekresultaten. dat vraagt een extra code-blok op de site."
+- Mobile pagespeed laag (pagespeedMobile<60, ALLEEN als pagespeedMobile != null): "mobile laadtijd is zwak. de grootste winst zit meestal in images comprimeren."
+
+BELANGRIJK: noem NOOIT dat "de andere X sneller laden" / "de andere 3 wel SSL hebben" / etc. — dat is verzonnen data (we hebben geen benchmark-cijfers van concurrenten). De framing is impliciet: "vergeleek X sites, dit viel op bij deze site." De lezer leest het relatieve element daar zelf in.
 
 **OPENER VERPLICHT (regel 1 = preview text):** start ALTIJD met een zin die positionering oproept zonder namen — de lezer moet meteen voelen "dit gaat over waar ik sta tegenover anderen". GEEN losse observatie over hun site, GEEN reviews-opener, GEEN generieke complimenten. Voorbeelden (pronoun-neutraal):
 - "vergeleek 4 [sector]-sites in [stad]."
@@ -199,13 +220,30 @@ Variant 1 (directe-observatie) start met zo'n positionering-statement. Variant 2
 - Elke zin die start met "ik help" + sector. Dat hoort in STAP 2 (WHO AM I), niet in de opener.
 De opener = benchmark-positioneringsstatement. Punt. De who-am-i komt pas NA de benchmark-framing (STAP 2 hieronder), en is optioneel-kort.
 
-KERNAANBOD framing (voorbeelden zijn pronoun-NEUTRAAL: pas 'u/je' aan zoals voorgeschreven in de DOELGROEP sectie boven):
-- "Ik vergeleek de site met 3 vergelijkbare [sector]-bedrijven in [regio]"
-- "Op een paar punten: snelheid, mobile, vindbaarheid"
-- "Niet om namen te noemen, gewoon om te zien waar de site staat"
-Pas dit aan op basis van sector + locatie uit de context. Houd het kort.`,
-      step2WhoAmI: 'STAP 2 — WHO AM I (optioneel, max 1 zin, ALTIJD NA het benchmark-framing, NOOIT als opener): "Ik ben Imad van Averis Solutions." of sla deze stap volledig over als de mail al vol zit. NOOIT "ik help [sector]" — dat breekt de variant-differentiatie.',
-      step3Offer: 'STAP 3 — OFFER: kondig de anonieme vergelijking aan met 1 zin sector/regio framing + 1 zin dimensie-opsomming. ZONDER namen, ook niet impliciet. Geen PDF/levertijd belofte.',
+**KERNAANBOD framing** (na opener + optionele who-am-i): 1 zin die de vergelijking-scope aankondigt + 2-3 bevindingen die opvielen bij DEZE site. Voorbeelden (pronoun-neutraal):
+- "Zag 3 dingen bij deze site tegenover de andere [sector]-sites in [regio]:"
+- "Drie punten vielen op bij deze site in de vergelijking:"
+- "Tijdens de vergelijking stond dit eruit:"
+Pas dit aan op basis van sector + locatie uit de context. Houd het kort. Daarna komen de 2-3 bevindingen uit de fix-lijst hierboven (één per paragraaf, 1-2 zinnen).
+
+**VERBODEN CTA-VORMEN** (dit zijn allemaal "vergelijking later sturen" in vermomming — ze breken het give-first principe omdat de belofte pas NA reply wordt gedaan):
+- "mag ik het sturen?"
+- "mag ik de vergelijking sturen?"
+- "interesse in de vergelijking?"
+- "interesse om te zien waar de site staat?"
+- "mag ik de benchmark sturen?"
+- "zal ik de vergelijking met de andere 3 delen?"
+- Elke vraag om toestemming om iets te MAKEN/STUREN dat nog niet bestaat.
+
+**WERKENDE CTA-VORMEN** (micro-commitment NA de al-geleverde waarde, ja/nee antwoordbaar, max 10 woorden):
+- "Wil je dat ik ook naar [specifiek ander punt] kijk?" (extra micro-give, anchor op iets dat al genoemd is)
+- "Zal ik tonen hoe een andere [sector] dat oploste?"
+- "Helpen die punten?" (validatie-vraag op de al gegeven waarde)
+- "Interesse om hier samen naar te kijken?"
+
+Kies ALLEEN een CTA die past bij wat de mail al gegeven heeft. Niet iets apart introduceren.`,
+      step2WhoAmI: 'STAP 2 — WHO AM I (optioneel, max 1 zin, ALTIJD NA de benchmark-opener, NOOIT als opener): "Ik ben Imad van Averis Solutions." of sla deze stap volledig over als de mail al vol zit. NOOIT "ik help [sector]" — dat breekt de variant-differentiatie.',
+      step3Offer: 'STAP 3 — OFFER: 1 zin benchmark-scope aankondiging + 2-3 bevindingen IN DE MAIL ZELF uit de audit data, elk met korte context (1 zin observatie, soms 1 zin uitleg). Niet beloven om een lijst/PDF later te sturen — de waarde wordt NU geleverd. NOOIT verzonnen stats over concurrenten ("de andere 3 laden 2x sneller").',
     };
   }
 
@@ -339,7 +377,10 @@ Voor je de JSON retourneert, ga ELK feit/claim in subject, body EN PS door:
 2. Verboden zonder data-bevestiging: "laadt traag", "werkt niet", "ontbreekt", "verouderd", "oud", "wazig", "mist", "prominenter kunnen staan", "meer zichtbaar".
 3. Verboden marktclaims: "[stad] heeft veel concurrentie", "veel vraag naar", "klanten zoeken dat vaak", "ziet Google graag".
 4. Als \`variant = geo_rapport\` EN \`detectedCms\` in de audit is Mobirise / Wix / oude WordPress / Joomla / statisch HTML → controleer dat die CMS EXPLICIET in de body staat en dat de opener ernaar verwijst. Zo niet → herschrijf de mail voor je output.
-5. Controleer elk getal / percentage / tijdsaanduiding op bron: komt het uit de context? Zo niet → verwijder.
+5. Als \`variant = concurrent_vergelijking\` → controleer dat de CTA GEEN van deze vormen is: "mag ik het sturen?", "mag ik de vergelijking sturen?", "interesse in de vergelijking?", "interesse om te zien waar de site staat?", of elke andere "stuur me iets later"-vraag. De waarde is AL GELEVERD in de body (2-3 bevindingen) → de CTA moet een micro-commitment zijn op die geleverde waarde ("Helpen die punten?", "Wil je dat ik ook naar X kijk?", "Zal ik tonen hoe een andere [sector] dit oploste?"). Zo niet → herschrijf de CTA voor je output.
+6. Als \`variant = concurrent_vergelijking\` → controleer dat je GEEN verzonnen concurrent-cijfers gebruikt ("de andere 3 laden 2x sneller", "de rest scoort hoger op X", "concurrenten hebben wel SSL"). De bevindingen gaan over DEZE site, de benchmark-framing is impliciet (lezer leest relatief erin). Zo niet → verwijder die claims.
+7. Als \`variant = concurrent_vergelijking\` EN \`detectedCms\` in de audit is Mobirise / Wix / oude WordPress / Joomla / statisch HTML → controleer dat die CMS als EERSTE bevinding in de body staat. Opener blijft benchmark-framing (NIET "site draait op X"). Zo niet → herschrijf de volgorde.
+8. Controleer elk getal / percentage / tijdsaanduiding op bron: komt het uit de context? Zo niet → verwijder.
 
 Gaat één check fout → fix eerst, dan pas output.`;
 
