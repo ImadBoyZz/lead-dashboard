@@ -12,6 +12,7 @@ import { generateOutreachPrompt, type OutreachContext } from '@/lib/ai/prompts';
 import { logAIUsage } from '@/lib/ai/cost-tracker';
 import { ITEMS_PER_PAGE } from '@/lib/constants';
 import { alreadyContactedRecently } from '@/lib/dedup';
+import { ACTIVE_DEAL_STAGES, type PipelineStage } from '@/lib/pipeline-logic';
 
 // Pro plan: ruim genoeg voor 25 sequentiële AI calls
 export const maxDuration = 300;
@@ -59,6 +60,23 @@ export async function POST(request: NextRequest) {
       const dedup = await alreadyContactedRecently(businessId);
       if (dedup.contacted) {
         skipped.push({ businessId, reason: dedup.reason ?? 'al gecontacteerd' });
+        continue;
+      }
+
+      // Safeguard: leads in actieve verkoop-fase (quote_sent / meeting / won) krijgen
+      // geen cold-outreach draft. Dezelfde gate zit ook in to-send (last-mile) en
+      // qualification-queue (upstream), maar hier sparen we AI-tokens.
+      const [pipeline] = await db
+        .select({ stage: schema.leadPipeline.stage })
+        .from(schema.leadPipeline)
+        .where(eq(schema.leadPipeline.businessId, businessId))
+        .limit(1);
+
+      if (pipeline && ACTIVE_DEAL_STAGES.includes(pipeline.stage as PipelineStage)) {
+        console.warn(
+          `[ai/generate/batch] safeguard: skip business=${businessId} stage=${pipeline.stage}`,
+        );
+        skipped.push({ businessId, reason: `pipeline_stage=${pipeline.stage} (actieve deal)` });
         continue;
       }
 

@@ -2,11 +2,18 @@ import { eq, and, or, notInArray, count, sql, lte } from 'drizzle-orm';
 import { db } from './db';
 import * as schema from './db/schema';
 
-type PipelineStage = 'new' | 'contacted' | 'quote_sent' | 'meeting' | 'won' | 'ignored';
+export type PipelineStage = 'new' | 'contacted' | 'quote_sent' | 'meeting' | 'won' | 'ignored';
 type RejectionReason = 'no_budget' | 'no_interest' | 'has_supplier' | 'bad_timing' | 'no_response' | 'other';
 
 const MAX_ACTIVE_LEADS = 15;
 const CLOSED_STAGES: PipelineStage[] = ['won', 'ignored'];
+
+/**
+ * Stages waarbij een lead in een actieve verkoop-fase zit.
+ * Cold outreach naar deze leads is verboden — ze krijgen een lopende deal of zijn al klant.
+ * Gebruikt door de send worker (last-mile gate) en qualification queue (upstream filter).
+ */
+export const ACTIVE_DEAL_STAGES: PipelineStage[] = ['quote_sent', 'meeting', 'won'];
 
 const STAGE_TO_STATUS: Record<string, string> = {
   new: 'new',

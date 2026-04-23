@@ -10,6 +10,7 @@ import { and, eq, isNull, or, sql as dsql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { authenticateSessionOrBearer } from '@/lib/webhook-auth';
+import { ACTIVE_DEAL_STAGES } from '@/lib/pipeline-logic';
 
 export async function GET(req: NextRequest) {
   if (!(await authenticateSessionOrBearer(req))) {
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest) {
   //     OF website_verdict IS NULL
   //     OF email_status = 'unverified'
   //   - geen recente outreach_log entry (laatste 90 dagen)
+  //   - niet in actieve sales-fase (quote_sent / meeting / won)
   const rows = await db
     .select({
       id: schema.businesses.id,
@@ -51,6 +53,12 @@ export async function GET(req: NextRequest) {
           SELECT 1 FROM outreach_log
           WHERE outreach_log.business_id = ${schema.businesses.id}
             AND outreach_log.contacted_at >= NOW() - INTERVAL '90 days'
+        )`,
+        // Safeguard: leads in actieve verkoop-fase mogen niet opnieuw door enrichment / batch generation
+        dsql`NOT EXISTS (
+          SELECT 1 FROM lead_pipeline
+          WHERE lead_pipeline.business_id = ${schema.businesses.id}
+            AND lead_pipeline.stage IN (${dsql.join(ACTIVE_DEAL_STAGES.map((s) => dsql`${s}`), dsql.raw(','))})
         )`,
       )!,
     )

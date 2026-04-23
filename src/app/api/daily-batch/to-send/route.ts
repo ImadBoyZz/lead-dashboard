@@ -18,6 +18,7 @@ import { isSendingPaused } from '@/lib/settings/system-settings';
 import { getMaxSendsToday } from '@/lib/deliverability/warmup';
 import { sendOutreachEmail } from '@/lib/email/send';
 import { generateUnsubscribeToken } from '@/lib/unsubscribe';
+import { ACTIVE_DEAL_STAGES, type PipelineStage } from '@/lib/pipeline-logic';
 
 export const maxDuration = 60;
 
@@ -134,6 +135,26 @@ export async function POST(req: NextRequest) {
       sent: false,
       skipped: true,
       reason: `email_status=${business.emailStatus}`,
+    });
+  }
+
+  // Safeguard: leads in actieve verkoop-fase mogen GEEN cold outreach krijgen.
+  // Beschermt bv. BBC Cars (quote_sent) tegen dubbele pitch tijdens een lopende deal.
+  const [pipeline] = await db
+    .select({ stage: schema.leadPipeline.stage })
+    .from(schema.leadPipeline)
+    .where(eq(schema.leadPipeline.businessId, businessId))
+    .limit(1);
+
+  if (pipeline && ACTIVE_DEAL_STAGES.includes(pipeline.stage as PipelineStage)) {
+    console.warn(
+      `[to-send] safeguard: skip business=${businessId} draft=${draftId} stage=${pipeline.stage}`,
+    );
+    await markDraft(draftId, 'rejected');
+    return NextResponse.json({
+      sent: false,
+      skipped: true,
+      reason: `pipeline_stage=${pipeline.stage} (actieve deal, geen cold pitch)`,
     });
   }
 
