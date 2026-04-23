@@ -457,6 +457,9 @@ export const outreachLog = pgTable('outreach_log', {
   deliveredAt: timestamp('delivered_at'),
   bouncedAt: timestamp('bounced_at'),
   complainedAt: timestamp('complained_at'),
+  // Mini-Fase-1.0: open tracking via Resend email.opened webhook
+  openedAt: timestamp('opened_at'),
+  openedCount: integer('opened_count').default(0).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
   index('outreach_log_business_idx').on(table.businessId),
@@ -651,6 +654,16 @@ export const systemSettings = pgTable('system_settings', {
   value: jsonb('value').notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   updatedBy: text('updated_by'),
+});
+
+// ── Mini-Fase-1.0: Webhook idempotency dedup ──────────────────────
+// Resend kan dezelfde webhook event meerdere keren retryen (network glitch,
+// timeout, etc). svix-id is uniek per event — door op INSERT te conflicteren
+// herkennen we duplicates en slaan we dubbele DB updates over.
+export const processedWebhookEvents = pgTable('processed_webhook_events', {
+  svixId: text('svix_id').primaryKey(),
+  eventType: text('event_type').notNull(),
+  receivedAt: timestamp('received_at').defaultNow().notNull(),
 });
 
 // ── Fase 1: Franchise Patterns (CRUD via admin UI later) ──────────

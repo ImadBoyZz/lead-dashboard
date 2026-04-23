@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { eq, sql as dsql } from 'drizzle-orm';
 import { Webhook } from 'svix';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
@@ -54,6 +54,26 @@ export async function POST(req: NextRequest) {
   const event = verifySignature(raw, req.headers);
   if (!event) {
     return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
+  }
+
+  // Idempotency gate: probeer svix-id te claimen. Als unique violation (23505),
+  // hebben we deze event al verwerkt - return 200 zodat Resend niet blijft retryen.
+  // Drizzle wrapt de Neon error in DrizzleQueryError, dus 23505 zit op cause.code.
+  const svixId = req.headers.get('svix-id');
+  if (svixId) {
+    try {
+      await db
+        .insert(schema.processedWebhookEvents)
+        .values({ svixId, eventType: event.type });
+    } catch (err) {
+      const code =
+        (err as { code?: string }).code ??
+        (err as { cause?: { code?: string } }).cause?.code;
+      if (code === '23505') {
+        return NextResponse.json({ ok: true, duplicate: true });
+      }
+      throw err;
+    }
   }
 
   const messageId = event.data.email_id;
@@ -122,9 +142,22 @@ export async function POST(req: NextRequest) {
       }
       break;
 
+    case 'email.opened':
+      if (log) {
+        await db
+          .update(schema.outreachLog)
+          .set({
+            // COALESCE op DB-niveau: voorkomt race tussen SELECT en UPDATE,
+            // en bij meerdere opens blijft openedAt het tijdstip van de eerste.
+            openedAt: dsql`COALESCE(${schema.outreachLog.openedAt}, NOW())`,
+            openedCount: dsql`${schema.outreachLog.openedCount} + 1`,
+          })
+          .where(eq(schema.outreachLog.id, log.id));
+      }
+      break;
+
     case 'email.sent':
     case 'email.delivery_delayed':
-    case 'email.opened':
     case 'email.clicked':
       // Nog geen actie; later te tracken in aparte kolommen.
       break;
