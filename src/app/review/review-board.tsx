@@ -90,6 +90,35 @@ export function ReviewBoard({ initialDrafts }: { initialDrafts: Draft[] }) {
     }
   }
 
+  async function bulkRejectSelected() {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    if (!confirm(`${ids.length} drafts afwijzen?`)) return;
+    setBusy(true);
+    try {
+      const res = await fetch('/api/daily-batch/bulk-reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draftIds: ids, reason: 'twijfel' }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Bulk reject faalde: ${err.error ?? res.status}`);
+        return;
+      }
+      const data = await res.json();
+      setDrafts((prev) =>
+        prev.map((d) => (ids.includes(d.id) ? { ...d, status: 'rejected' } : d)),
+      );
+      setSelected(new Set());
+      if (data.skipped > 0) {
+        alert(`${data.rejected} afgewezen, ${data.skipped} overgeslagen (niet in pending/approved state).`);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function toggleSelected(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -188,6 +217,14 @@ export function ReviewBoard({ initialDrafts }: { initialDrafts: Draft[] }) {
             >
               <Check className="h-4 w-4" />
               Goedkeuren ({selected.size})
+            </button>
+            <button
+              onClick={bulkRejectSelected}
+              disabled={selected.size === 0 || busy}
+              className="px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white disabled:opacity-50 inline-flex items-center gap-2"
+            >
+              <X className="h-4 w-4" />
+              Afwijzen ({selected.size})
             </button>
           </>
         )}

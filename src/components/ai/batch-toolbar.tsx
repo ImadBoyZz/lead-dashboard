@@ -53,6 +53,9 @@ export function BatchToolbar({ showScan = false, idsWithEmail, idsWithWebsite }:
       }
 
       const data = await res.json();
+      if (data.skipped > 0) {
+        alert(`${data.count} drafts gegenereerd. ${data.skipped} leads overgeslagen (al gecontacteerd of actieve draft).`);
+      }
       clearAll();
       router.push(`/leads/batch/${data.campaignId}`);
     } catch {

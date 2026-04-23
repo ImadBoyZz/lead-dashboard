@@ -11,6 +11,7 @@ import { getToneForNace } from '@/lib/ai/tone';
 import { generateOutreachPrompt, type OutreachContext } from '@/lib/ai/prompts';
 import { logAIUsage } from '@/lib/ai/cost-tracker';
 import { ITEMS_PER_PAGE } from '@/lib/constants';
+import { alreadyContactedRecently } from '@/lib/dedup';
 
 // Pro plan: ruim genoeg voor 25 sequentiële AI calls
 export const maxDuration = 300;
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
     let totalPromptTokens = 0;
     let totalCompletionTokens = 0;
     let count = 0;
+    const skipped: { businessId: string; reason: string }[] = [];
     const startTime = Date.now();
     const TIME_LIMIT_MS = 280_000; // Stop 20s voor Vercel timeout
 
@@ -51,6 +53,15 @@ export async function POST(request: NextRequest) {
     for (const businessId of businessIds) {
       // Veiligheidscheck: stop voor timeout
       if (Date.now() - startTime > TIME_LIMIT_MS) break;
+
+      // Dedup-gate: skip als al gecontacteerd of actieve draft bestaat.
+      // Voorkomt verspilde AI-tokens en drafts die bij approve toch geblokkeerd worden.
+      const dedup = await alreadyContactedRecently(businessId);
+      if (dedup.contacted) {
+        skipped.push({ businessId, reason: dedup.reason ?? 'al gecontacteerd' });
+        continue;
+      }
+
       const business = await db.query.businesses.findFirst({
         where: eq(schema.businesses.id, businessId),
       });
@@ -167,6 +178,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       campaignId,
       count,
+      skipped: skipped.length,
+      skippedDetails: skipped,
       totalUsage: { promptTokens: totalPromptTokens, completionTokens: totalCompletionTokens },
     });
   } catch (error) {
