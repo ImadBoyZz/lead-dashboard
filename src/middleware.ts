@@ -16,6 +16,7 @@ const PUBLIC_PATHS = [
   '/api/unsubscribe',    // HMAC-signed token
   '/unsubscribe',        // landing page (valideert token zelf)
   '/api/inbound/resend', // Resend webhook (svix signature)
+  '/api/tracking/open',  // self-hosted open pixel (HMAC-signed token)
 ];
 
 export async function middleware(request: NextRequest) {

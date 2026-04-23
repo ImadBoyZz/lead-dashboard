@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq, sql as dsql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { Webhook } from 'svix';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
@@ -143,17 +143,14 @@ export async function POST(req: NextRequest) {
       break;
 
     case 'email.opened':
-      if (log) {
-        await db
-          .update(schema.outreachLog)
-          .set({
-            // COALESCE op DB-niveau: voorkomt race tussen SELECT en UPDATE,
-            // en bij meerdere opens blijft openedAt het tijdstip van de eerste.
-            openedAt: dsql`COALESCE(${schema.outreachLog.openedAt}, NOW())`,
-            openedCount: dsql`${schema.outreachLog.openedCount} + 1`,
-          })
-          .where(eq(schema.outreachLog.id, log.id));
-      }
+      // Self-hosted pixel in send.ts is de authoritative bron voor
+      // open tracking (single source of truth). Resend's eventueel
+      // door hun server-side geïnjecteerde pixel zou hier ook
+      // triggeren — log diagnostiek, maar MUTATE GEEN DB om dubbele
+      // telling te voorkomen.
+      console.info(
+        `[webhook] email.opened event received — NO-OP (self-hosted pixel is primary). messageId=${messageId}`,
+      );
       break;
 
     case 'email.sent':

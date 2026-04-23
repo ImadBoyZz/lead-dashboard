@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { env } from '@/lib/env';
 import { buildUnsubscribeUrl } from '@/lib/unsubscribe';
 import { appendFooter } from '@/lib/email-footer';
+import { buildOpenTrackingUrl } from '@/lib/tracking';
 
 let client: Resend | null = null;
 
@@ -28,6 +29,9 @@ export type SendOutreachInput = {
   subject: string;
   body: string;
   businessId: string;
+  // Pre-gen UUID die ook gebruikt wordt voor de outreach_log row PK.
+  // Nodig zodat de open-tracking pixel URL bekend is vóór de send call.
+  outreachLogId: string;
   replyTo?: string;
 };
 
@@ -39,11 +43,15 @@ export type SendOutreachResult = {
 export async function sendOutreachEmail(
   input: SendOutreachInput,
 ): Promise<SendOutreachResult> {
-  const { to, subject, body, businessId } = input;
+  const { to, subject, body, businessId, outreachLogId } = input;
 
   const unsubscribeUrl = buildUnsubscribeUrl(businessId);
+  const trackingUrl = buildOpenTrackingUrl(outreachLogId);
+  const trackingPixel = `<img src="${trackingUrl}" width="1" height="1" style="display:none" alt="" />`;
   const bodyWithFooter = appendFooter(body, businessId, 'text');
-  const htmlBody = `${plainTextToHtml(body)}${appendFooter('', businessId, 'html')}`;
+  // Pixel als laatste element van de HTML body, na footer. Email clients sluiten
+  // missing tags automatisch (we sturen geen <html>/<body> wrapper).
+  const htmlBody = `${plainTextToHtml(body)}${appendFooter('', businessId, 'html')}${trackingPixel}`;
 
   const from = `${env.RESEND_FROM_NAME} <${env.RESEND_FROM_EMAIL}>`;
   const replyTo = input.replyTo ?? env.RESEND_FROM_EMAIL;

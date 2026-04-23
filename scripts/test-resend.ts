@@ -18,6 +18,7 @@ async function main() {
   const { neon } = await import('@neondatabase/serverless');
   const { drizzle } = await import('drizzle-orm/neon-http');
   const { sql } = await import('drizzle-orm');
+  const { randomUUID } = await import('node:crypto');
 
   // Pak een willekeurige bestaande business voor de unsubscribe token —
   // anders is de landing page /unsubscribe/... leeg want er wordt op id gezocht.
@@ -55,6 +56,7 @@ async function main() {
       subject,
       body,
       businessId: business.id,
+      outreachLogId: randomUUID(),
     });
     console.log('\n✓ Verzonden');
     console.log('  Resend message id:', result.messageId);

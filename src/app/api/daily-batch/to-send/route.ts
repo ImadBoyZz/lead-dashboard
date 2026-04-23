@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { eq, sql as dsql, gte, and } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { authenticateN8n, authenticateSessionOrBearer } from '@/lib/webhook-auth';
@@ -158,7 +159,10 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 5. Verstuur via Resend
+  // 5. Verstuur via Resend.
+  // Pre-genereer outreachLogId zodat de open-tracking pixel URL bekend is voor send.
+  // Dezelfde UUID wordt straks gebruikt als PK voor de outreach_log row.
+  const outreachLogId = randomUUID();
   let messageId: string;
   let unsubscribeUrl: string;
   try {
@@ -167,6 +171,7 @@ export async function POST(req: NextRequest) {
       subject: draft.subject ?? '(Geen onderwerp)',
       body: draft.body,
       businessId,
+      outreachLogId,
     });
     messageId = result.messageId;
     unsubscribeUrl = result.unsubscribeUrl;
@@ -182,6 +187,7 @@ export async function POST(req: NextRequest) {
   // 6. outreachLog entry + draft status 'sent'
   try {
     await db.insert(schema.outreachLog).values({
+      id: outreachLogId,
       businessId,
       channel: 'email',
       subject: draft.subject,
