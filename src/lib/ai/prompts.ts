@@ -108,6 +108,7 @@ const AI_TELL_BLACKLIST = [
  */
 function buildVariantBlocks(variant: GiveFirstVariant): {
   giveFirstSection: string;
+  step2WhoAmI: string;
   step3Offer: string;
 } {
   if (variant === 'geo_rapport') {
@@ -148,6 +149,13 @@ Elk met een korte menselijke fix-tip. Formule per bevinding: "zag X. fix: Y." (1
 - "laadtijd mobile is zwak."
 Variant 1 (directe-observatie) start met zo'n observatie. Variant 2 (vraag-opener) start met "Korte vraag over [specifiek audit-punt]," — niet generiek "Korte vraag,".
 
+**HARDE REJECT OPENERS** (breken de variant-differentiatie want dit is wat control doet):
+- "Ik help [sector] in Vlaanderen meer klanten via hun site."
+- "Ik help [sector]-bedrijven met ..."
+- "ik help autobedrijven / kappers / bouwbedrijven ..."
+- Elke zin die start met "ik help" + sector. Dat hoort in STAP 2 (WHO AM I), niet in de opener.
+De opener = audit-observatie. Punt. De who-am-i komt pas NA de gegeven waarde (STAP 2 hieronder), en is optioneel-kort.
+
 **VERBODEN CTA-VORMEN** (dit zijn allemaal "gratis audit" in vermomming, en ze breken het give-first principe omdat de belofte pas na reply wordt gedaan):
 - "mag ik dat op een rijtje zetten?"
 - "die inzichten sturen?"
@@ -163,6 +171,7 @@ Variant 1 (directe-observatie) start met zo'n observatie. Variant 2 (vraag-opene
 - "Helpen die punten?" (validatie-vraag op de al gegeven waarde)
 
 Kies ALLEEN een CTA die past bij wat de mail al gegeven heeft. Niet iets apart introduceren.`,
+      step2WhoAmI: 'STAP 2 — WHO AM I (optioneel, max 1 zin, ALTIJD NA de audit-observatie, NOOIT als opener): "Ik ben Imad van Averis Solutions." of sla deze stap volledig over als de mail al vol zit. NOOIT "ik help [sector]" — dat breekt de variant-differentiatie.',
       step3Offer: 'STAP 3 — OFFER: geef 2-3 concrete audit-bevindingen IN DE MAIL ZELF, elk met korte fix-tip (1 zin observatie + 1 zin hoe op te lossen). Niet beloven om een lijst later te sturen — de waarde wordt NU geleverd.',
     };
   }
@@ -183,11 +192,19 @@ LEAN START fulfillment-flag: Imad bouwt de benchmark zelf op basis van Google Pa
 - "hoe scoort [sector] in [stad] online?"
 Variant 1 (directe-observatie) start met zo'n positionering-statement. Variant 2 (vraag-opener) start met "Korte vraag over [sector] in [regio]," — niet generiek "Korte vraag,". Vul [sector] en [stad] in uit de context.
 
+**HARDE REJECT OPENERS** (breken de variant-differentiatie want dit is wat control doet):
+- "Ik help [sector] in Vlaanderen meer klanten via hun site."
+- "Ik help [sector]-bedrijven met ..."
+- "ik help autobedrijven / kappers / bouwbedrijven ..."
+- Elke zin die start met "ik help" + sector. Dat hoort in STAP 2 (WHO AM I), niet in de opener.
+De opener = benchmark-positioneringsstatement. Punt. De who-am-i komt pas NA de benchmark-framing (STAP 2 hieronder), en is optioneel-kort.
+
 KERNAANBOD framing (voorbeelden zijn pronoun-NEUTRAAL: pas 'u/je' aan zoals voorgeschreven in de DOELGROEP sectie boven):
 - "Ik vergeleek de site met 3 vergelijkbare [sector]-bedrijven in [regio]"
 - "Op een paar punten: snelheid, mobile, vindbaarheid"
 - "Niet om namen te noemen, gewoon om te zien waar de site staat"
 Pas dit aan op basis van sector + locatie uit de context. Houd het kort.`,
+      step2WhoAmI: 'STAP 2 — WHO AM I (optioneel, max 1 zin, ALTIJD NA het benchmark-framing, NOOIT als opener): "Ik ben Imad van Averis Solutions." of sla deze stap volledig over als de mail al vol zit. NOOIT "ik help [sector]" — dat breekt de variant-differentiatie.',
       step3Offer: 'STAP 3 — OFFER: kondig de anonieme vergelijking aan met 1 zin sector/regio framing + 1 zin dimensie-opsomming. ZONDER namen, ook niet impliciet. Geen PDF/levertijd belofte.',
     };
   }
@@ -201,6 +218,7 @@ Het aanbod is ALTIJD een gratis demo homepage. "Echte werkende site, geen mockup
 - **Geen website**: "Ik bouw een gratis demo homepage voor [Bedrijfsnaam]."
 - **Verouderde website**: benoem 2 specifieke zwakke punten van hun huidige site + "moderne site levert meer klanten. Ik maak een demo om dat concreet te tonen."
 - **Moderne website**: skip deze lead (in scoring moet hij al gediscold zijn).`,
+    step2WhoAmI: 'STAP 2 — WHO AM I: 1 zin, "Ik help [sector] in Vlaanderen meer klanten via hun site." (dit is de status-quo baseline — control variant moet byte-identiek blijven aan de pre-Fase-1 prompt).',
     step3Offer: 'STAP 3 — OFFER: gratis demo homepage aankondiging, 5 dagen levertijd, 1 pain angle uit lijst boven.',
   };
 }
@@ -212,7 +230,7 @@ export function generateOutreachPrompt(ctx: OutreachContext): { system: string; 
   const cluster = getClusterForNace(ctx.naceCode);
   const clusterCfg = getClusterConfig(cluster);
   const variant: GiveFirstVariant = ctx.giveFirstVariant ?? 'control';
-  const { giveFirstSection, step3Offer } = buildVariantBlocks(variant);
+  const { giveFirstSection, step2WhoAmI, step3Offer } = buildVariantBlocks(variant);
 
   const blacklistLines = AI_TELL_BLACKLIST.map((t) => `  - "${t}"`).join('\n');
   const clusterBanLines = clusterCfg.vocabularyBlacklist.map((w) => `  - "${w}"`).join('\n');
@@ -289,7 +307,7 @@ ${giveFirstSection}
 ## 4-STAP STRUCTUUR
 
 STAP 1 — PERSONALISATIE (regel 1 = preview text): specifieke observatie, 4-8 woorden, niet greeting.
-STAP 2 — WHO AM I: 1 zin, "Ik help [sector] in Vlaanderen meer klanten via hun site."
+${step2WhoAmI}
 ${step3Offer}
 STAP 4 — CTA: 1 yes/no vraag.
 + PS
