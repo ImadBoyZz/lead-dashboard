@@ -9,6 +9,7 @@ import { rateLimit } from '@/lib/rate-limit';
 import { getAIProvider } from '@/lib/ai/provider';
 import { getToneForNace } from '@/lib/ai/tone';
 import { generateOutreachPrompt, type OutreachContext } from '@/lib/ai/prompts';
+import { sanitizeVariant } from '@/lib/ai/sanitize';
 import { logAIUsage } from '@/lib/ai/cost-tracker';
 import { ITEMS_PER_PAGE } from '@/lib/constants';
 import { alreadyContactedRecently } from '@/lib/dedup';
@@ -200,8 +201,11 @@ export async function POST(request: NextRequest) {
           // outreach_drafts_business_active_uniq index blokkeert duplicates).
           let savedThisLead = 0;
           for (let i = 0; i < Math.min(variants.length, 2); i++) {
-            const v = variants[i];
-            if (!v?.body) continue;
+            const rawVariant = variants[i];
+            if (!rawVariant?.body) continue;
+            // Post-processing: strip em/en-dashes uit subject/body/ps voor DB-insert.
+            // Beschermt tegen AI die ondanks de prompt-ban toch dashes produceert.
+            const v = sanitizeVariant(rawVariant);
             try {
               await db.insert(schema.outreachDrafts).values({
                 businessId,
