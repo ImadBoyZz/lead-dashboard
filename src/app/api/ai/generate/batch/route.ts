@@ -13,6 +13,8 @@ import { logAIUsage } from '@/lib/ai/cost-tracker';
 import { ITEMS_PER_PAGE } from '@/lib/constants';
 import { alreadyContactedRecently } from '@/lib/dedup';
 import { ACTIVE_DEAL_STAGES, type PipelineStage } from '@/lib/pipeline-logic';
+import { assignVariantForLead } from '@/lib/ai/variant-assignment';
+import { DEFAULT_CADENCE_EXPERIMENT_ID } from '@/lib/sequence-cadence';
 
 // Pro plan: ruim genoeg voor 25 sequentiële AI calls
 export const maxDuration = 300;
@@ -21,6 +23,9 @@ const batchSchema = z.object({
   businessIds: z.array(z.string().uuid()).min(1).max(ITEMS_PER_PAGE),
   channel: z.enum(['email', 'phone']),
   templateStyle: z.string().optional(),
+  // Fase 1: optional experiment id voor A/B variant-assignment.
+  // Indien afwezig → fallback naar Default Cadence experiment (altijd 'control').
+  experimentId: z.string().uuid().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -49,6 +54,29 @@ export async function POST(request: NextRequest) {
     const skipped: { businessId: string; reason: string }[] = [];
     const startTime = Date.now();
     const TIME_LIMIT_MS = 280_000; // Stop 20s voor Vercel timeout
+
+    // Fase 1: experiment lookup. Bij ontbrekende experimentId in payload valt
+    // de batch terug op de Default Cadence experiment (altijd 'control').
+    // Bij meegegeven maar onbekende experimentId → 400 (geen stille fallback).
+    const lookupExperimentId = parsed.data.experimentId ?? DEFAULT_CADENCE_EXPERIMENT_ID;
+    const [experiment] = await db
+      .select()
+      .from(schema.experiments)
+      .where(eq(schema.experiments.id, lookupExperimentId))
+      .limit(1);
+
+    if (!experiment) {
+      if (parsed.data.experimentId) {
+        return NextResponse.json(
+          { error: `Experiment ${parsed.data.experimentId} niet gevonden` },
+          { status: 400 },
+        );
+      }
+      return NextResponse.json(
+        { error: 'Default Cadence experiment ontbreekt — migratie 0013 niet correct toegepast?' },
+        { status: 500 },
+      );
+    }
 
     // Sequentieel verwerken (rate limits)
     for (const businessId of businessIds) {
@@ -96,6 +124,16 @@ export async function POST(request: NextRequest) {
       const toon = getToneForNace(business.naceCode);
       const scoreBreakdown = (score?.scoreBreakdown ?? {}) as Record<string, { points: number; reason: string }>;
 
+      // Hash-based variant assignment: zelfde (businessId, experimentId)
+      // geeft altijd dezelfde variant — reproduceerbaar bij retry.
+      const giveFirstVariant = assignVariantForLead({
+        businessId,
+        experimentId: experiment.id,
+        splitPercentage: experiment.splitPercentage,
+        testVariant: experiment.testVariant,
+        controlVariant: experiment.controlVariant,
+      });
+
       const context: OutreachContext = {
         bedrijfsnaam: business.name,
         sector: business.sector,
@@ -119,6 +157,7 @@ export async function POST(request: NextRequest) {
         eerdereOutreach: [],
         toon,
         kanaal: channel,
+        giveFirstVariant,
       };
 
       const { system, user } = generateOutreachPrompt(context);
@@ -154,24 +193,48 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Sla eerste variant op als draft
-          const variant = variants[0];
-          if (variant?.body) {
-            await db.insert(schema.outreachDrafts).values({
-              businessId,
-              campaignId,
-              channel,
-              subject: variant.subject ?? null,
-              body: variant.body,
-              tone: toon,
-              aiProvider: provider.providerName,
-              aiModel: provider.modelName,
-              promptTokens: response.usage.promptTokens,
-              completionTokens: response.usage.completionTokens,
-              variantIndex: 0,
-            });
-            count++;
+          // Fase 1: sla BEIDE varianten op (variant_index 0 en 1) met dezelfde
+          // experimentId + giveFirstVariant. AI geeft al 2 tone-varianten terug
+          // in één call — vroeger werd variant 1 weggegooid. Per-insert try/catch
+          // op 23505 zodat retry-na-partial-save niet steeds crasht (de
+          // outreach_drafts_business_active_uniq index blokkeert duplicates).
+          let savedThisLead = 0;
+          for (let i = 0; i < Math.min(variants.length, 2); i++) {
+            const v = variants[i];
+            if (!v?.body) continue;
+            try {
+              await db.insert(schema.outreachDrafts).values({
+                businessId,
+                campaignId,
+                channel,
+                subject: v.subject ?? null,
+                body: v.body,
+                tone: toon,
+                aiProvider: provider.providerName,
+                aiModel: provider.modelName,
+                promptTokens: response.usage.promptTokens,
+                completionTokens: response.usage.completionTokens,
+                variantIndex: i,
+                experimentId: experiment.id,
+                giveFirstVariant,
+              });
+              savedThisLead++;
+            } catch (insertErr) {
+              const code =
+                (insertErr as { code?: string }).code ??
+                (insertErr as { cause?: { code?: string } }).cause?.code;
+              if (code === '23505') {
+                console.warn(
+                  `[ai/generate/batch] variant ${i} for ${businessId} bestaat al (retry-after-partial-save)`,
+                );
+                savedThisLead++;
+              } else {
+                throw insertErr;
+              }
+            }
           }
+          // count = aantal verwerkte leads (1 per lead, niet per draft)
+          if (savedThisLead > 0) count++;
 
           totalPromptTokens += response.usage.promptTokens;
           totalCompletionTokens += response.usage.completionTokens;
