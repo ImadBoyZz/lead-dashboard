@@ -6,12 +6,14 @@ import {
   boolean,
   integer,
   real,
+  numeric,
   timestamp,
   pgEnum,
   jsonb,
   date,
   uniqueIndex,
   index,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 // ── Enums ──────────────────────────────────────────────
@@ -557,12 +559,18 @@ export const outreachDrafts = pgTable('outreach_drafts', {
   selectedVariant: boolean('selected_variant').default(false),
   templateId: uuid('template_id')
     .references(() => outreachTemplates.id),
+  // Fase 1: experiment tracking. NULL voor pre-Fase-1 drafts en ad-hoc drafts.
+  // Verplicht ingevuld door batch generator wanneer experimentId in payload zit.
+  experimentId: uuid('experiment_id')
+    .references((): AnyPgColumn => experiments.id, { onDelete: 'set null' }),
+  giveFirstVariant: text('give_first_variant'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => [
   index('outreach_drafts_business_idx').on(table.businessId),
   index('outreach_drafts_campaign_idx').on(table.campaignId),
   index('outreach_drafts_status_idx').on(table.status),
+  index('outreach_drafts_experiment_idx').on(table.experimentId, table.giveFirstVariant),
 ]);
 
 // ── AI: Scoring Feedback ─────────────────────────────
@@ -790,3 +798,153 @@ export const kboSnapshot = pgTable('kbo_snapshot', {
   durationSeconds: integer('duration_seconds'),
   notes: text('notes'),
 });
+
+// ── Fase 1: Experiments + Reply Classifications + Sequence Queue ───
+
+export const experimentStatusEnum = pgEnum('experiment_status', [
+  'running',
+  'paused',
+  'concluded',
+]);
+
+export const replyClassificationEnum = pgEnum('reply_classification', [
+  'positive',
+  'negative',
+  'unsubscribe',
+  'auto_reply',
+  'unclear',
+]);
+
+export const sequenceQueueStatusEnum = pgEnum('sequence_queue_status', [
+  'pending',
+  'sent',
+  'skipped',
+  'cancelled',
+]);
+
+/**
+ * Variant-test campagnes (give-first A/B). Een experiment definieert welke
+ * twee prompt-branches gebenchmarkt worden, in welke verhouding, en met welke
+ * pre-registered hypothese. Metrics worden via JOIN gecomputed (geen cached counts).
+ *
+ * Speciale "Default Cadence" row met static UUID seedt ad-hoc sends die niet
+ * onder een echt experiment vallen — zorgt dat sequence_queue.experiment_id
+ * NOT NULL kan blijven.
+ */
+export const experiments = pgTable('experiments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),                                     // "Fase 3: Concurrent vs GEO"
+  testVariant: text('test_variant').notNull(),                      // bv. 'concurrent_vergelijking'
+  controlVariant: text('control_variant').notNull(),                // bv. 'geo_rapport'
+  splitPercentage: integer('split_percentage').default(70).notNull(), // 70 = 70% test / 30% control
+  hypothesis: text('hypothesis'),                                    // pre-registered, vóór start
+  // numeric returnt string in Drizzle - app-code moet parseFloat() doen.
+  expectedReplyRate: numeric('expected_reply_rate', { precision: 4, scale: 3 }),
+  minSampleSize: integer('min_sample_size'),                         // per arm
+  targetSends: integer('target_sends'),                              // totaal over beide arms
+  startsAt: timestamp('starts_at').notNull(),
+  endsAt: timestamp('ends_at'),
+  status: experimentStatusEnum('status').default('running').notNull(),
+  conclusion: text('conclusion'),                                    // 'winner' | 'loser' | 'inconclusive'
+  notes: text('notes'),                                              // post-hoc observaties
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('experiments_status_starts_at_idx').on(table.status, table.startsAt),
+]);
+
+/**
+ * Gestructureerde reply outcomes voor positive-reply-rate metric.
+ * Granulariteit-eerste-laag is bewust kort (5 buckets); subtype kolom houdt
+ * ruimte open voor later finer detail (bv. 'meeting_request', 'wrong_person')
+ * zonder schema migratie.
+ *
+ * Positive-reply metric definitie: classification = 'positive'.
+ */
+export const replyClassifications = pgTable('reply_classifications', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  outreachLogId: uuid('outreach_log_id').notNull()
+    .references(() => outreachLog.id, { onDelete: 'cascade' }),
+  businessId: uuid('business_id').notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
+  classification: replyClassificationEnum('classification').notNull(),
+  subtype: text('subtype'),                                          // optional finer granularity, e.g. 'meeting_request'
+  replyText: text('reply_text'),                                     // raw quote, app trimt op 4000 chars
+  receivedAt: timestamp('received_at').notNull(),
+  classifiedBy: text('classified_by').default('human').notNull(),    // 'human' | 'ai' | 'auto_rule'
+  // numeric returnt string in Drizzle - app-code moet parseFloat() doen.
+  aiConfidence: numeric('ai_confidence', { precision: 3, scale: 2 }), // 0.00-1.00, alleen bij ai/auto_rule
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('reply_classifications_business_received_idx').on(table.businessId, table.receivedAt),
+  index('reply_classifications_classification_received_idx').on(table.classification, table.receivedAt),
+  index('reply_classifications_outreach_log_idx').on(table.outreachLogId),
+]);
+
+/**
+ * Follow-up cadence queue. Eén rij per geplande stap (initial + follow-ups).
+ * SEQUENCE_DAYS = [0, 3, 7, 14] gehard-coded in src/lib/sequence-cadence.ts.
+ *
+ * experiment_id is NOT NULL — ad-hoc sends koppelen we aan de "Default Cadence"
+ * experiment (static UUID) zodat we geen NULL-edge cases hoeven te handelen.
+ *
+ * ON DELETE RESTRICT op experiment_id: een experiment verwijderen vereist
+ * eerst dat alle bijbehorende sequence_queue rijen worden gecancelled
+ * (status='cancelled', skip_reason='experiment_concluded') of verwijderd.
+ * Dit beschermt de Default Cadence en voorkomt accident drops.
+ */
+export const sequenceQueue = pgTable('sequence_queue', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  businessId: uuid('business_id').notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
+  experimentId: uuid('experiment_id').notNull()
+    .references(() => experiments.id, { onDelete: 'restrict' }),    // RESTRICT: voorkomt accident drop van experiment dat queue heeft
+  giveFirstVariant: text('give_first_variant').notNull(),            // 'geo_rapport' | 'concurrent_vergelijking' | 'control'
+  sequenceStep: integer('sequence_step').notNull(),                  // 0=initial, 1=day3, 2=day7, 3=day14 break-up
+  scheduledFor: timestamp('scheduled_for').notNull(),                 // UTC
+  status: sequenceQueueStatusEnum('status').default('pending').notNull(),
+  sentOutreachLogId: uuid('sent_outreach_log_id')
+    .references(() => outreachLog.id, { onDelete: 'set null' }),
+  skipReason: text('skip_reason'),                                   // 'replied' | 'opted_out' | 'bounced' | 'manual_pause' | 'experiment_concluded'
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('sequence_queue_status_scheduled_idx').on(table.status, table.scheduledFor),
+  index('sequence_queue_business_step_idx').on(table.businessId, table.sequenceStep),
+  index('sequence_queue_experiment_status_idx').on(table.experimentId, table.status),
+  uniqueIndex('sequence_queue_business_experiment_step_uniq').on(
+    table.businessId, table.experimentId, table.sequenceStep,
+  ),
+]);
+
+// ── Fase 1 Relations ────────────────────────────────────
+
+export const experimentsRelations = relations(experiments, ({ many }) => ({
+  drafts: many(outreachDrafts),
+  queueRows: many(sequenceQueue),
+}));
+
+export const replyClassificationsRelations = relations(replyClassifications, ({ one }) => ({
+  outreachLog: one(outreachLog, {
+    fields: [replyClassifications.outreachLogId],
+    references: [outreachLog.id],
+  }),
+  business: one(businesses, {
+    fields: [replyClassifications.businessId],
+    references: [businesses.id],
+  }),
+}));
+
+export const sequenceQueueRelations = relations(sequenceQueue, ({ one }) => ({
+  business: one(businesses, {
+    fields: [sequenceQueue.businessId],
+    references: [businesses.id],
+  }),
+  experiment: one(experiments, {
+    fields: [sequenceQueue.experimentId],
+    references: [experiments.id],
+  }),
+  sentOutreachLog: one(outreachLog, {
+    fields: [sequenceQueue.sentOutreachLogId],
+    references: [outreachLog.id],
+  }),
+}));
