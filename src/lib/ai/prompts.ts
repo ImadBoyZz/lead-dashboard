@@ -2,6 +2,19 @@ import { type Tone, getToneInstruction, getClusterForNace, getClusterConfig } fr
 
 // ── Shared context types ──────────────────────────────
 
+/**
+ * Give-first variant voor A/B testing. Bepaalt welk aanbod in de mail komt:
+ * - 'control'                 = bestaande demo-homepage prompt (status quo baseline)
+ * - 'geo_rapport'             = 2-3 lean inzichten over hun website (vindbaarheid)
+ * - 'concurrent_vergelijking' = anonieme benchmark vs vergelijkbare bedrijven
+ *
+ * Fulfillment-flag: voor geo_rapport en concurrent_vergelijking bouwt Imad de
+ * inhoud HANDMATIG na een positieve reply — er is geen auto-PDF generator.
+ * Daarom blijft de CTA-belofte bewust vaag ("inzichten op een rijtje", "waar
+ * je staat") in plaats van concreet ("PDF binnen 2 werkdagen").
+ */
+export type GiveFirstVariant = 'geo_rapport' | 'concurrent_vergelijking' | 'control';
+
 export interface OutreachContext {
   bedrijfsnaam: string;
   sector: string | null;
@@ -25,6 +38,8 @@ export interface OutreachContext {
   eerdereOutreach: { channel: string; outcome: string | null }[];
   toon: Tone;
   kanaal: 'email' | 'phone';
+  // Fase 1: A/B test variant. Default 'control' (= huidige demo-homepage prompt).
+  giveFirstVariant?: GiveFirstVariant;
 }
 
 export interface FollowUpContext {
@@ -83,12 +98,76 @@ const AI_TELL_BLACKLIST = [
   'ik hoop dat je het goed maakt',
 ];
 
+// ── Variant-specifieke blokken voor give-first A/B test ──
+
+/**
+ * Returnt de "GIVE-FIRST" + bijbehorende STAP 3 (OFFER) tekst voor de gekozen
+ * variant. Dit is het ENIGE deel van de system-prompt dat varieert tussen
+ * varianten — alle harde regels (12w/zin, lowercase subject, AI-blacklist,
+ * pronoun, anti-patronen, signature) zijn gedeeld.
+ */
+function buildVariantBlocks(variant: GiveFirstVariant): {
+  giveFirstSection: string;
+  step3Offer: string;
+} {
+  if (variant === 'geo_rapport') {
+    return {
+      giveFirstSection: `## GIVE-FIRST = INZICHTEN OVER HUN VINDBAARHEID (variant: geo_rapport)
+Het aanbod is dat Imad 2-3 concrete inzichten over hun website mag delen, dingen die hij in de audit data hierboven heeft opgemerkt en die ze gemakkelijk kunnen verbeteren. Geen volledige PDF, geen uitgebreide analyse. Gewoon: "ik zag X, Y, Z. Mag ik dat op een rijtje zetten?".
+
+LEAN START fulfillment-flag: Imad bouwt de inzichten zelf op basis van wat de lead vraagt. Vermijd specifieke beloftes zoals "PDF binnen X dagen", "Excel rapport", "audit document". Houd het open. Werkende CTA-vormen voor stap 4 (allemaal pronoun-neutraal, AI past pronoun aan via de DOELGROEP regel): "mag ik dat op een rijtje zetten?", "die inzichten sturen?", "interesse om te bekijken?".
+
+KERNAANBOD framing op basis van audit data (kies 2-3 bevindingen die EXPLICIET in de context staan).
+LET OP voorbeelden hieronder zijn pronoun-NEUTRAAL geschreven: pas de pronoun ('u' of 'je') aan zoals voorgeschreven in de DOELGROEP sectie boven.
+- Mobile pagespeed laag (<60): "site laadt traag op mobile"
+- Geen SSL: "geen https, Google ranked daardoor lager"
+- Geen Google Analytics: "geen tracking, dus geen zicht op welke pagina werkt"
+- Niet mobile responsive: "site schaalt niet op iPhone, en dat is 70% van het bezoek"
+- Geen structured data: "Google toont de sterren niet in zoekresultaten"
+Combineer 2-3 van deze (ALLEEN als data het bevestigt, anti-hallucinatie regel 6 blijft).`,
+      step3Offer: 'STAP 3 — OFFER: noem 2-3 concrete inzichten kort (1 zin elk). Bied aan om ze op een rijtje te zetten. Geen specifieke PDF/levertijd belofte. Hoort lean en menselijk.',
+    };
+  }
+
+  if (variant === 'concurrent_vergelijking') {
+    return {
+      giveFirstSection: `## GIVE-FIRST = ANONIEME BENCHMARK (variant: concurrent_vergelijking)
+Het aanbod is een korte anonieme vergelijking met een paar vergelijkbare bedrijven uit hun sector/regio op 3-5 simpele dimensies (snelheid, mobile UX, vindbaarheid, content-frequentie). NOOIT namen noemen, niet in deze mail, niet bij navraag, niet ooit. De waarde zit in zien hoe ze relatief scoren.
+
+PRIVACY-CRITICAL: schrijf de mail zo dat het anonieme karakter expliciet blijkt: "anoniem", "vergelijkbare bedrijven", "soortgelijke spelers", "in de regio", "lokaal". Zo voorkomen we dat de lead vraagt "wie zijn die concurrenten?". En als ze het wel vragen, noemt Imad nog steeds geen namen.
+
+LEAN START fulfillment-flag: Imad bouwt de benchmark zelf op basis van Google PageSpeed + manuele observatie van 3-5 concurrenten. Geen automated tool. Vermijd beloftes als "PDF rapport" of "uitgebreide analyse". Werkende CTA-vormen voor stap 4 (pronoun-neutraal, AI past pronoun aan via de DOELGROEP regel): "interesse om te zien waar de site staat?", "mag ik het sturen?", "interesse in de vergelijking?".
+
+KERNAANBOD framing (voorbeelden zijn pronoun-NEUTRAAL: pas 'u/je' aan zoals voorgeschreven in de DOELGROEP sectie boven):
+- "Ik vergeleek de site met 3 vergelijkbare [sector]-bedrijven in [regio]"
+- "Op een paar punten: snelheid, mobile, vindbaarheid"
+- "Niet om namen te noemen, gewoon om te zien waar de site staat"
+Pas dit aan op basis van sector + locatie uit de context. Houd het kort.`,
+      step3Offer: 'STAP 3 — OFFER: kondig de anonieme vergelijking aan met 1 zin sector/regio framing + 1 zin dimensie-opsomming. ZONDER namen, ook niet impliciet. Geen PDF/levertijd belofte.',
+    };
+  }
+
+  // 'control' = huidige demo-homepage prompt (status quo baseline)
+  return {
+    giveFirstSection: `## GIVE-FIRST = DEMO HOMEPAGE (Imad-specifiek, NIET Loom)
+Het aanbod is ALTIJD een gratis demo homepage. "Echte werkende site, geen mockup, geen screenshot. Binnen 5 dagen klaar." Niet: audit PDF, niet: Loom video, niet: gratis call.
+
+**KERNAANBOD afhankelijk van website-staat:**
+- **Geen website**: "Ik bouw een gratis demo homepage voor [Bedrijfsnaam]."
+- **Verouderde website**: benoem 2 specifieke zwakke punten van hun huidige site + "moderne site levert meer klanten. Ik maak een demo om dat concreet te tonen."
+- **Moderne website**: skip deze lead (in scoring moet hij al gediscold zijn).`,
+    step3Offer: 'STAP 3 — OFFER: gratis demo homepage aankondiging, 5 dagen levertijd, 1 pain angle uit lijst boven.',
+  };
+}
+
 // ── Prompt generators ─────────────────────────────────
 
 export function generateOutreachPrompt(ctx: OutreachContext): { system: string; user: string } {
   const toonInstructie = getToneInstruction(ctx.toon);
   const cluster = getClusterForNace(ctx.naceCode);
   const clusterCfg = getClusterConfig(cluster);
+  const variant: GiveFirstVariant = ctx.giveFirstVariant ?? 'control';
+  const { giveFirstSection, step3Offer } = buildVariantBlocks(variant);
 
   const blacklistLines = AI_TELL_BLACKLIST.map((t) => `  - "${t}"`).join('\n');
   const clusterBanLines = clusterCfg.vocabularyBlacklist.map((w) => `  - "${w}"`).join('\n');
@@ -143,13 +222,7 @@ ${blacklistLines}
 **Cluster-specifieke ban voor ${cluster}:**
 ${clusterBanLines}
 
-## GIVE-FIRST = DEMO HOMEPAGE (Imad-specifiek, NIET Loom)
-Het aanbod is ALTIJD een gratis demo homepage. "Echte werkende site, geen mockup, geen screenshot. Binnen 5 dagen klaar." Niet: audit PDF, niet: Loom video, niet: gratis call.
-
-**KERNAANBOD afhankelijk van website-staat:**
-- **Geen website**: "Ik bouw een gratis demo homepage voor [Bedrijfsnaam]."
-- **Verouderde website**: benoem 2 specifieke zwakke punten van hun huidige site + "moderne site levert meer klanten. Ik maak een demo om dat concreet te tonen."
-- **Moderne website**: skip deze lead (in scoring moet hij al gediscold zijn).
+${giveFirstSection}
 
 ## ANTI-PATRONEN (NOOIT)
 - NOOIT em-dash "—" (gebruik punt of komma)
@@ -164,7 +237,7 @@ Het aanbod is ALTIJD een gratis demo homepage. "Echte werkende site, geen mockup
 
 STAP 1 — PERSONALISATIE (regel 1 = preview text): specifieke observatie, 4-8 woorden, niet greeting.
 STAP 2 — WHO AM I: 1 zin, "Ik help [sector] in Vlaanderen meer klanten via hun site."
-STAP 3 — OFFER: gratis demo homepage aankondiging, 5 dagen levertijd, 1 pain angle uit lijst boven.
+${step3Offer}
 STAP 4 — CTA: 1 yes/no vraag.
 + PS
 + Signature "Imad"
