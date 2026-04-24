@@ -31,6 +31,7 @@ export default async function WarmLeadsPage({ searchParams }: PageProps) {
   const hasWebsite = (params.hasWebsite as string) || undefined;
   const province = (params.province as string) || undefined;
   const search = (params.search as string) || undefined;
+  const promotedBy = (params.promotedBy as string) || undefined; // 'auto' | 'manual' | undefined
   const page = Math.max(1, parseInt((params.page as string) || "1", 10));
   const limit = ITEMS_PER_PAGE;
   const offset = (page - 1) * limit;
@@ -44,6 +45,12 @@ export default async function WarmLeadsPage({ searchParams }: PageProps) {
       isNull(schema.leadStatuses.status),
     )!,
   ];
+
+  if (promotedBy === 'auto') {
+    conditions.push(isNotNull(schema.businesses.autoPromotedAt));
+  } else if (promotedBy === 'manual') {
+    conditions.push(isNull(schema.businesses.autoPromotedAt));
+  }
 
   if (sector) {
     conditions.push(eq(schema.businesses.sector, sector));
@@ -121,7 +128,7 @@ export default async function WarmLeadsPage({ searchParams }: PageProps) {
       />
 
       <WarmLeadFilters
-        filters={{ sector, status, hasWebsite, province, search }}
+        filters={{ sector, status, hasWebsite, province, search, promotedBy }}
       />
 
       <Card>
@@ -158,12 +165,19 @@ export default async function WarmLeadsPage({ searchParams }: PageProps) {
                         <LeadCheckbox leadId={row.business.id} />
                       </td>
                       <td className="px-4 py-3">
-                        <Link
-                          href={"/leads/" + row.business.id}
-                          className="font-medium text-foreground hover:text-accent transition-colors"
-                        >
-                          {row.business.name}
-                        </Link>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Link
+                            href={"/leads/" + row.business.id}
+                            className="font-medium text-foreground hover:text-accent transition-colors"
+                          >
+                            {row.business.name}
+                          </Link>
+                          {row.business.autoPromotedAt && (
+                            <Badge variant="info" className="shrink-0">
+                              Auto-gepromoot
+                            </Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-muted capitalize">
                         {row.business.sector ?? "\u2014"}

@@ -4,7 +4,6 @@ import { useRouter, usePathname } from "next/navigation";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { BELGIAN_PROVINCES } from "@/lib/constants";
 import { ALL_SECTORS } from "@/lib/places-discovery";
 import { Search } from "lucide-react";
 import { useRef } from "react";
@@ -16,6 +15,7 @@ interface WarmLeadFiltersProps {
     hasWebsite?: string;
     province?: string;
     search?: string;
+    promotedBy?: string;
   };
 }
 
@@ -85,6 +85,15 @@ export function WarmLeadFilters({ filters }: WarmLeadFiltersProps) {
           ]}
           value={filters.hasWebsite ?? ""}
           onChange={(e) => updateFilter("hasWebsite", e.target.value)}
+        />
+        <Select
+          options={[
+            { value: "", label: "Alle promoties" },
+            { value: "auto", label: "Auto-gepromoot" },
+            { value: "manual", label: "Handmatig" },
+          ]}
+          value={filters.promotedBy ?? ""}
+          onChange={(e) => updateFilter("promotedBy", e.target.value)}
         />
         {hasActiveFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters}>
