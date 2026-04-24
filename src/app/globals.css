@@ -17,11 +17,46 @@
   --color-sidebar-foreground: #e2e8f0;
   --color-sidebar-hover: #334155;
   --color-sidebar-active: #2563eb;
+  --color-surface-hover: #f1f5f9;
+  --color-border-subtle: rgba(15, 23, 42, 0.06);
+  --color-dot-glow-success: rgba(22, 163, 74, 0.22);
+  --color-dot-glow-warning: rgba(217, 119, 6, 0.22);
+  --color-dot-glow-danger: rgba(220, 38, 38, 0.22);
+  --color-dot-glow-idle: rgba(100, 116, 139, 0.2);
   --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
 }
 
 body {
   background: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
+}
+
+/* Linear/Stripe observability: tabular numerics opt-in via font-mono util */
+.font-mono, .tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+/* Respect reduced motion for status-dot pulse and feed polling transitions */
+@media (prefers-reduced-motion: reduce) {
+  .motion-pulse { animation: none !important; }
+  .motion-fade-in { animation: none !important; }
+}
+
+@keyframes motion-pulse-kf {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.motion-pulse {
+  animation: motion-pulse-kf 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes motion-fade-in-kf {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.motion-fade-in {
+  animation: motion-fade-in-kf 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
