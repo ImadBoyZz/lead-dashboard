@@ -34,4 +34,7 @@ export const env = {
   RESEND_WEBHOOK_SECRET: (process.env.RESEND_WEBHOOK_SECRET ?? '').trim(),
   // Unsubscribe HMAC signing key (verschillend van DASHBOARD_SECRET)
   UNSUBSCRIBE_SECRET: (process.env.UNSUBSCRIBE_SECRET ?? process.env.DASHBOARD_SECRET ?? '').trim(),
+  // Telegram alerting voor auto-pause / silent-failure signals (optioneel — geen alert als ontbreekt)
+  TELEGRAM_BOT_TOKEN: (process.env.TELEGRAM_BOT_TOKEN ?? '').trim(),
+  TELEGRAM_CHAT_ID: (process.env.TELEGRAM_CHAT_ID ?? '').trim(),
 } as const;
