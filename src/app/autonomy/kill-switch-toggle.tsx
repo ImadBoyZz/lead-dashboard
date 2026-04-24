@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Loader2 } from "lucide-react";
+import { Pause, Play, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { StatusDot } from "@/components/ui/status-dot";
 
 interface SendSettingsResponse {
   sendEnabled: boolean;
@@ -38,9 +37,9 @@ export function KillSwitchToggle() {
           setError(body?.error ?? "Kon niet opslaan");
           return;
         }
-        const fresh: SendSettingsResponse = await fetch(
-          "/api/settings/system",
-        ).then((r) => r.json());
+        const fresh: SendSettingsResponse = await fetch("/api/settings/system").then((r) =>
+          r.json(),
+        );
         setState(fresh);
       } catch {
         setError("Netwerkfout");
@@ -50,8 +49,8 @@ export function KillSwitchToggle() {
 
   if (!state) {
     return (
-      <div className="flex items-center gap-2 text-[12px] text-ink-muted">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      <div className="flex items-center gap-2 text-sm text-muted">
+        <Loader2 className="h-4 w-4 animate-spin" />
         Status laden…
       </div>
     );
@@ -60,22 +59,32 @@ export function KillSwitchToggle() {
   const enabled = state.sendEnabled;
 
   return (
-    <div className="flex items-center justify-between gap-6 w-full">
-      <div className="flex items-start gap-3 min-w-0">
-        <StatusDot variant={enabled ? "success" : "danger"} pulse={!enabled} />
+    <div className="flex items-center justify-between gap-4 w-full">
+      <div className="flex items-center gap-3 min-w-0">
+        <div
+          className={cn(
+            "flex items-center justify-center w-10 h-10 rounded-full shrink-0",
+            enabled
+              ? "bg-green-50 text-success"
+              : "bg-red-50 text-danger",
+          )}
+          aria-hidden
+        >
+          {enabled ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+        </div>
         <div className="min-w-0">
-          <div className="text-[13px] font-medium text-ink">
-            {enabled ? "Versturen is actief" : "Versturen is gepauzeerd"}
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            {enabled ? "Versturen staat aan" : "Versturen is gepauzeerd"}
           </div>
-          <p className="text-[12px] text-ink-muted mt-0.5 leading-[1.5]">
+          <p className="text-xs text-muted mt-0.5 truncate">
             {enabled
-              ? "De n8n send-worker pakt elke 5 min approved drafts uit de queue."
+              ? "n8n send-worker pakt approved drafts uit de queue."
               : state.pausedUntil
                 ? `Gepauzeerd tot ${new Date(state.pausedUntil).toLocaleString("nl-BE")}`
-                : "Er worden geen mails verstuurd tot je heractiveert."}
+                : "Er worden geen mails verstuurd tot je dit heractiveert."}
           </p>
           {error && (
-            <p className="text-[12px] text-danger mt-1">{error}</p>
+            <p className="text-xs text-danger mt-1">{error}</p>
           )}
         </div>
       </div>
@@ -85,14 +94,13 @@ export function KillSwitchToggle() {
         disabled={pending}
         onClick={toggle}
         className={cn(
-          "inline-flex items-center font-mono tabular text-[11px] tracking-[0.08em] uppercase",
-          "h-8 px-3 rounded-[2px] border transition-colors disabled:opacity-60 shrink-0",
+          "px-3 py-2 text-sm font-medium rounded-md transition-colors disabled:opacity-60",
           enabled
-            ? "border-[--color-rule-strong] text-ink hover:bg-[--color-surface-hover]"
-            : "border-[color:var(--color-success)]/60 text-[color:var(--color-success)] hover:bg-[--color-success-weak]",
+            ? "bg-foreground text-white hover:bg-slate-700"
+            : "bg-success text-white hover:bg-green-500",
         )}
       >
-        {pending ? "..." : enabled ? "Pauzeer →" : "Heractiveer →"}
+        {pending ? "..." : enabled ? "Pauzeer" : "Heractiveer"}
       </button>
     </div>
   );

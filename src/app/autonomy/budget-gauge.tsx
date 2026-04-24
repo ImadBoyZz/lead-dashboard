@@ -1,3 +1,5 @@
+import { Card } from "@/components/ui/card";
+
 interface BudgetGaugeProps {
   spentEur: number;
   budgetEur: number;
@@ -9,23 +11,15 @@ const ENDPOINT_LABEL: Record<string, string> = {
   "/api/enrich/full": "Enrich (full)",
   "/api/enrich/website": "Enrich website",
   "/api/enrich/email": "Enrich email",
-  "/api/ai/generate/batch": "Drafts UI",
-  "/api/daily-batch/generate-drafts": "Drafts auto",
+  "/api/ai/generate/batch": "Drafts (UI)",
+  "/api/daily-batch/generate-drafts": "Drafts (auto)",
   "/api/daily-batch/discover": "Discovery",
 };
 
-export function BudgetGauge({
-  spentEur,
-  budgetEur,
-  byEndpoint,
-}: BudgetGaugeProps) {
+export function BudgetGauge({ spentEur, budgetEur, byEndpoint }: BudgetGaugeProps) {
   const pct = budgetEur > 0 ? Math.min(100, (spentEur / budgetEur) * 100) : 0;
   const accentColor =
-    pct >= 95
-      ? "var(--color-danger)"
-      : pct >= 80
-        ? "var(--color-warning)"
-        : "var(--color-ink)";
+    pct >= 95 ? "var(--color-danger)" : pct >= 80 ? "var(--color-warning)" : "var(--color-accent)";
 
   const sortedEndpoints = [...byEndpoint]
     .filter((e) => e.costEur > 0)
@@ -33,95 +27,71 @@ export function BudgetGauge({
     .slice(0, 5);
 
   return (
-    <section className="bg-surface border border-[--color-rule] rounded-[2px] h-full">
-      <header className="px-6 pt-5 pb-4 border-b border-[--color-rule]">
-        <div className="module-label mb-1.5">§ 04 — dagbudget</div>
-        <h2 className="text-[15px] leading-[1.3] font-medium text-ink tracking-[-0.01em]">
-          Vandaag verbruikt
-        </h2>
-        <p className="text-[12.5px] text-ink-muted mt-1 leading-[1.5]">
-          LLM en scrape-kosten sinds middernacht CET
-        </p>
-      </header>
+    <Card className="!p-0 overflow-hidden h-full">
+      <div className="px-6 py-4 border-b border-[--color-border-subtle]">
+        <h3 className="text-base font-semibold text-foreground">Dagbudget</h3>
+        <p className="text-sm text-muted mt-0.5">LLM + scrape kosten vandaag</p>
+      </div>
 
-      <div className="p-6 space-y-5">
-        {/* Bar-style gauge ipv circle — meer Working Drawing */}
-        <div>
-          <div className="flex items-baseline justify-between mb-2">
-            <div className="flex items-baseline gap-2">
-              <span className="font-mono tabular text-[28px] leading-none tracking-[-0.02em] text-ink">
-                €{spentEur.toFixed(3)}
-              </span>
-              <span className="text-[13px] text-ink-muted font-mono tabular">
-                / €{budgetEur.toFixed(2)}
-              </span>
-            </div>
-            <span className="font-mono tabular text-[13px] text-ink-muted">
-              {pct.toFixed(1)}%
+      <div className="p-6 grid grid-cols-[auto_1fr] gap-6 items-center">
+        <div
+          className="relative w-24 h-24 rounded-full shrink-0"
+          style={{
+            background: `conic-gradient(${accentColor} ${pct * 3.6}deg, var(--color-border-subtle) 0)`,
+          }}
+          aria-label={`Budget ${pct.toFixed(0)}% gebruikt`}
+          role="img"
+        >
+          <div className="absolute inset-1.5 rounded-full bg-card flex items-center justify-center">
+            <span className="font-mono tabular text-xl font-medium text-foreground">
+              {pct.toFixed(0)}%
             </span>
-          </div>
-
-          <div className="h-[5px] w-full bg-[--color-rule] relative">
-            <div
-              className="absolute inset-y-0 left-0 transition-[width] duration-500"
-              style={{ width: `${pct}%`, backgroundColor: accentColor }}
-              aria-hidden
-            />
-            {/* 80% warning marker */}
-            <div
-              className="absolute top-[-3px] bottom-[-3px] w-px bg-[--color-rule-strong]"
-              style={{ left: "80%" }}
-              aria-hidden
-            />
-          </div>
-
-          <div className="flex items-center justify-between mt-2 text-[11px] font-mono tabular text-ink-soft">
-            <span>€0</span>
-            <span>80% alert</span>
-            <span>€{budgetEur}</span>
           </div>
         </div>
 
-        {sortedEndpoints.length > 0 && (
-          <div className="pt-4 border-t border-[--color-rule]">
-            <div className="module-label mb-3">Top cost drivers</div>
-            <ul className="space-y-2.5">
-              {sortedEndpoints.map((e) => {
-                const rowPct = spentEur > 0 ? (e.costEur / spentEur) * 100 : 0;
-                const label =
-                  ENDPOINT_LABEL[e.endpoint] ?? e.endpoint.replace("/api/", "");
-                return (
-                  <li
-                    key={e.endpoint}
-                    className="grid grid-cols-[1fr_auto] gap-4 items-center"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-baseline gap-2 text-[12.5px]">
-                        <span className="text-ink truncate" title={e.endpoint}>
-                          {label}
-                        </span>
-                        <span className="font-mono tabular text-[11px] text-ink-soft">
-                          {rowPct.toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="h-[2px] mt-1.5 bg-[--color-rule]">
-                        <div
-                          className="h-full bg-ink-muted"
-                          style={{ width: `${rowPct}%` }}
-                          aria-hidden
-                        />
-                      </div>
-                    </div>
-                    <span className="font-mono tabular text-[12.5px] text-ink w-16 text-right">
-                      €{e.costEur.toFixed(3)}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+        <div className="flex flex-col gap-1 min-w-0">
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-mono tabular text-2xl font-medium text-foreground">
+              €{spentEur.toFixed(3)}
+            </span>
+            <span className="text-sm text-muted font-mono tabular">/ €{budgetEur}</span>
           </div>
-        )}
+          <span className="text-xs text-muted">
+            €{Math.max(0, budgetEur - spentEur).toFixed(3)} resterend vandaag
+          </span>
+        </div>
       </div>
-    </section>
+
+      {sortedEndpoints.length > 0 && (
+        <div className="border-t border-[--color-border-subtle] px-6 py-4">
+          <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground mb-2">
+            Top cost drivers
+          </div>
+          <ul className="space-y-1.5">
+            {sortedEndpoints.map((e) => {
+              const pct = spentEur > 0 ? (e.costEur / spentEur) * 100 : 0;
+              const label = ENDPOINT_LABEL[e.endpoint] ?? e.endpoint.replace("/api/", "");
+              return (
+                <li key={e.endpoint} className="grid grid-cols-[1fr_auto_auto] gap-3 items-center">
+                  <span className="text-sm text-foreground truncate" title={e.endpoint}>
+                    {label}
+                  </span>
+                  <div className="w-20 h-1 rounded-full bg-[--color-border-subtle] overflow-hidden">
+                    <div
+                      className="h-full bg-accent"
+                      style={{ width: `${pct}%` }}
+                      aria-hidden
+                    />
+                  </div>
+                  <span className="font-mono tabular text-xs text-muted w-14 text-right">
+                    €{e.costEur.toFixed(3)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </Card>
   );
 }

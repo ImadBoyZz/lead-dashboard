@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
+
+const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "Lead Dashboard — Averis Solutions",
@@ -11,8 +12,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="nl" className={`${GeistSans.variable} ${GeistMono.variable}`}>
-      <body className="font-sans antialiased">
+    <html lang="nl">
+      <body className={inter.className}>
         <AppShell>{children}</AppShell>
       </body>
     </html>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StatusDot } from "@/components/ui/status-dot";
 
 type HealthState = "green" | "yellow" | "red" | "unknown";
 
@@ -13,11 +14,18 @@ interface HealthResponse {
   failedRecent: number;
 }
 
-const GLYPH = {
-  green: { ch: "●", color: "text-success", label: "Systeem actief" },
-  yellow: { ch: "◐", color: "text-warning", label: "Aandacht vereist" },
-  red: { ch: "■", color: "text-danger", label: "Send gepauzeerd" },
-  unknown: { ch: "○", color: "text-ink-soft", label: "Status onbekend" },
+const STATE_TO_VARIANT = {
+  green: "success",
+  yellow: "warning",
+  red: "danger",
+  unknown: "idle",
+} as const;
+
+const STATE_TO_LABEL = {
+  green: "Systeem actief",
+  yellow: "Aandacht vereist",
+  red: "Send gepauzeerd",
+  unknown: "Status onbekend",
 } as const;
 
 export function SidebarHealthDot() {
@@ -25,18 +33,16 @@ export function SidebarHealthDot() {
 
   useEffect(() => {
     let cancelled = false;
-
     async function fetchHealth() {
       try {
         const res = await fetch("/api/autonomy/health");
-        if (!res.ok || cancelled) return;
+        if (!res.ok) return;
         const json = (await res.json()) as HealthResponse;
         if (!cancelled) setData(json);
       } catch {
-        // keep prior state
+        // laat vorige state staan
       }
     }
-
     fetchHealth();
     const id = setInterval(fetchHealth, 60_000);
     return () => {
@@ -46,41 +52,19 @@ export function SidebarHealthDot() {
   }, []);
 
   const state: HealthState = data?.state ?? "unknown";
-  const glyph = GLYPH[state];
-  const label = data?.pausedReason ?? glyph.label;
+  const variant = STATE_TO_VARIANT[state];
+  const label = data?.pausedReason ?? STATE_TO_LABEL[state];
 
   return (
-    <div className="px-3 space-y-1" role="status" aria-live="polite">
-      <div className="module-label">§ status</div>
-      <div className="flex items-center gap-2">
-        <span
-          aria-hidden
-          className={`font-mono text-[14px] leading-none ${glyph.color} ${
-            state === "red" ? "motion-pulse" : ""
-          }`}
-        >
-          {glyph.ch}
-        </span>
-        <span
-          className="text-[12px] text-ink-muted truncate"
-          title={label}
-        >
-          {label}
-        </span>
-      </div>
-      {data && (
-        <div className="flex items-center gap-3 text-[10.5px] font-mono tabular text-ink-soft pl-5">
-          <span>
-            budget <span className="text-ink-muted">{data.budgetPct}%</span>
-          </span>
-          {data.runningCount > 0 && (
-            <span className="text-accent">running {data.runningCount}</span>
-          )}
-          {data.failedRecent > 0 && (
-            <span className="text-danger">errors {data.failedRecent}</span>
-          )}
-        </div>
-      )}
+    <div className="flex items-center gap-2 px-1 py-1.5" role="status" aria-live="polite">
+      <StatusDot
+        variant={variant}
+        size="sm"
+        pulse={state === "red"}
+      />
+      <span className="text-[11px] text-sidebar-foreground/60 truncate" title={label}>
+        {label}
+      </span>
     </div>
   );
 }

@@ -10,21 +10,27 @@ interface StatusDotProps {
   className?: string;
 }
 
-/*
- * Status glyph — geometrische shapes ipv gekleurde dots met glow.
- * Mechanischer, past bij Working Drawing karakter.
- *   ● success — gevulde cirkel
- *   ◐ warning — halfgevuld
- *   ■ danger  — gevuld vierkant (breekt ritme van cirkels → trekt oog)
- *   ○ idle    — lege cirkel
- *   ◇ running — ruit (in-beweging connotatie)
- */
-const VARIANT_STYLES: Record<StatusDotVariant, { ch: string; color: string }> = {
-  success: { ch: "●", color: "text-success" },
-  warning: { ch: "◐", color: "text-warning" },
-  danger: { ch: "■", color: "text-danger" },
-  idle: { ch: "○", color: "text-ink-soft" },
-  running: { ch: "◇", color: "text-accent" },
+const VARIANT_STYLES: Record<StatusDotVariant, { bg: string; glow: string }> = {
+  success: {
+    bg: "bg-success",
+    glow: "shadow-[0_0_0_3px_var(--color-dot-glow-success)]",
+  },
+  warning: {
+    bg: "bg-warning",
+    glow: "shadow-[0_0_0_3px_var(--color-dot-glow-warning)]",
+  },
+  danger: {
+    bg: "bg-danger",
+    glow: "shadow-[0_0_0_3px_var(--color-dot-glow-danger)]",
+  },
+  idle: {
+    bg: "bg-slate-400",
+    glow: "shadow-[0_0_0_3px_var(--color-dot-glow-idle)]",
+  },
+  running: {
+    bg: "bg-accent",
+    glow: "shadow-[0_0_0_3px_rgba(37,99,235,0.22)]",
+  },
 };
 
 export function StatusDot({
@@ -34,29 +40,28 @@ export function StatusDot({
   label,
   className,
 }: StatusDotProps) {
-  const { ch, color } = VARIANT_STYLES[variant];
-  const sizeCls = size === "sm" ? "text-[10px]" : "text-[12px]";
+  const { bg, glow } = VARIANT_STYLES[variant];
+  const sizeCls = size === "sm" ? "w-1.5 h-1.5" : "w-2 h-2";
 
-  const glyph = (
+  const dot = (
     <span
       aria-hidden
       className={cn(
-        "inline-block font-mono leading-none",
+        "inline-block rounded-full shrink-0",
         sizeCls,
-        color,
+        bg,
+        glow,
         pulse && "motion-pulse",
         className,
       )}
-    >
-      {ch}
-    </span>
+    />
   );
 
-  if (!label) return glyph;
+  if (!label) return dot;
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted">
-      {glyph}
+    <span className="inline-flex items-center gap-2 text-xs text-muted">
+      {dot}
       <span>{label}</span>
     </span>
   );

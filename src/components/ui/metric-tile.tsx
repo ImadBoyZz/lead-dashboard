@@ -5,23 +5,17 @@ interface MetricTileProps {
   value: string | number;
   unit?: string;
   hint?: string;
-  accent?: "default" | "success" | "warning" | "danger" | "accent";
+  accent?: "default" | "success" | "warning" | "danger";
   className?: string;
 }
 
 const ACCENT_STYLES: Record<NonNullable<MetricTileProps["accent"]>, string> = {
-  default: "text-ink",
+  default: "text-foreground",
   success: "text-success",
   warning: "text-warning",
   danger: "text-danger",
-  accent: "text-accent",
 };
 
-/**
- * MetricTile — module-label boven, grote mono-tabular waarde, klein hint.
- * Nieuwe stijl: display font groter, lichter gewicht, iets meer vertical rhythm.
- * Bedoeld om grote getallen dominant te maken zonder decoratie.
- */
 export function MetricTile({
   label,
   value,
@@ -31,26 +25,24 @@ export function MetricTile({
   className,
 }: MetricTileProps) {
   return (
-    <div className={cn("flex flex-col", className)}>
-      <span className="module-label">{label}</span>
-      <div className="flex items-baseline gap-1.5 mt-2">
+    <div className={cn("flex flex-col gap-1", className)}>
+      <span className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+        {label}
+      </span>
+      <div className="flex items-baseline gap-1.5">
         <span
           className={cn(
-            "font-mono tabular text-[28px] leading-none tracking-[-0.02em] font-normal",
+            "text-2xl leading-none font-mono tabular font-medium",
             ACCENT_STYLES[accent],
           )}
         >
           {value}
         </span>
         {unit && (
-          <span className="text-[13px] text-ink-muted font-mono tabular">{unit}</span>
+          <span className="text-sm text-muted font-mono tabular">{unit}</span>
         )}
       </div>
-      {hint && (
-        <span className="text-[12px] text-ink-muted mt-1.5 leading-[1.4]">
-          {hint}
-        </span>
-      )}
+      {hint && <span className="text-xs text-muted">{hint}</span>}
     </div>
   );
 }

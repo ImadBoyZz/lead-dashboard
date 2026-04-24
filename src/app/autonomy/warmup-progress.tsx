@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { Card } from "@/components/ui/card";
 
 interface WarmupProgressProps {
   startDate: string | null;
@@ -9,11 +9,11 @@ interface WarmupProgressProps {
 }
 
 const STAGES = [
-  { untilDay: 7, max: 5, label: "w0" },
-  { untilDay: 14, max: 10, label: "w1" },
-  { untilDay: 21, max: 25, label: "w2" },
-  { untilDay: 28, max: 50, label: "w3" },
-  { untilDay: 56, max: 100, label: "w4+" },
+  { untilDay: 7, max: 5, label: "week 0" },
+  { untilDay: 14, max: 10, label: "week 1" },
+  { untilDay: 21, max: 25, label: "week 2" },
+  { untilDay: 28, max: 50, label: "week 3" },
+  { untilDay: 56, max: 100, label: "volle capaciteit" },
 ];
 
 const TOTAL_DAYS = 28;
@@ -30,62 +30,46 @@ export function WarmupProgress({
       ? 0
       : Math.min(100, (Math.min(currentDay, TOTAL_DAYS) / TOTAL_DAYS) * 100);
 
-  const nextStage = STAGES.find(
-    (s) => currentDay !== null && currentDay < s.untilDay,
-  );
+  const nextStage = STAGES.find((s) => currentDay !== null && currentDay < s.untilDay);
 
   return (
-    <section className="bg-surface border border-[--color-rule] rounded-[2px] h-full">
-      <header className="px-6 pt-5 pb-4 border-b border-[--color-rule]">
-        <div className="module-label mb-1.5">§ 03 — warmup ramp</div>
-        <h2 className="text-[15px] leading-[1.3] font-medium text-ink tracking-[-0.01em]">
+    <Card className="!p-0 overflow-hidden">
+      <div className="px-6 py-4 border-b border-[--color-border-subtle]">
+        <h3 className="text-base font-semibold text-foreground">Warmup ramp</h3>
+        <p className="text-sm text-muted mt-0.5">
           {overridden
-            ? "Override actief"
+            ? `Override actief · vaste cap ${maxSendsToday}/dag`
             : stage === "not_started"
               ? "Nog niet gestart"
-              : `Dag ${currentDay ?? "—"} / ${TOTAL_DAYS}`}
-        </h2>
-        <p className="text-[12.5px] text-ink-muted mt-1 leading-[1.5] font-mono tabular">
-          cap {maxSendsToday}/dag
-          {startDate && ` · start ${new Date(startDate).toLocaleDateString("nl-BE")}`}
+              : currentDay !== null
+                ? `Dag ${currentDay} van ${TOTAL_DAYS} · cap ${maxSendsToday}/dag`
+                : stage}
         </p>
-      </header>
+      </div>
 
-      <div className="p-6 space-y-5">
-        {/* Progress track */}
+      <div className="p-6 space-y-4">
         <div className="relative">
-          <div className="h-[3px] w-full bg-[--color-rule] relative">
+          <div className="h-2 w-full rounded-full bg-[--color-border-subtle] overflow-hidden">
             <div
-              className="absolute inset-y-0 left-0 bg-ink transition-[width] duration-500"
+              className="h-full rounded-full bg-accent transition-[width] duration-500"
               style={{ width: `${pct}%` }}
               aria-hidden
             />
           </div>
 
-          <div className="relative mt-2 h-4">
-            {[7, 14, 21, 28].map((d) => {
-              const left = (d / TOTAL_DAYS) * 100;
-              const reached = currentDay !== null && currentDay >= d;
+          <div className="relative mt-3 h-5">
+            {STAGES.slice(0, -1).map((s) => {
+              const stageLeft = (s.untilDay / TOTAL_DAYS) * 100;
+              if (stageLeft > 100) return null;
               return (
                 <div
-                  key={d}
+                  key={s.untilDay}
                   className="absolute top-0 flex flex-col items-center -translate-x-1/2"
-                  style={{ left: `${left}%` }}
+                  style={{ left: `${stageLeft}%` }}
                 >
-                  <span
-                    className={cn(
-                      "w-px h-1.5",
-                      reached ? "bg-ink" : "bg-[--color-rule]",
-                    )}
-                    aria-hidden
-                  />
-                  <span
-                    className={cn(
-                      "font-mono tabular text-[10px] tracking-[0.04em] mt-0.5",
-                      reached ? "text-ink-muted" : "text-ink-soft",
-                    )}
-                  >
-                    d{d}
+                  <span className="w-px h-1.5 bg-card-border" aria-hidden />
+                  <span className="text-[10px] text-muted-foreground font-mono tabular mt-0.5">
+                    d{s.untilDay}
                   </span>
                 </div>
               );
@@ -93,38 +77,22 @@ export function WarmupProgress({
           </div>
         </div>
 
-        {/* Stage grid */}
-        <div className="grid grid-cols-5 border-t border-[--color-rule] pt-4">
-          {STAGES.map((s, idx) => {
-            const prevDay = idx > 0 ? STAGES[idx - 1].untilDay : 0;
+        <div className="grid grid-cols-5 gap-2 text-[11px]">
+          {STAGES.map((s) => {
             const isActive =
-              currentDay !== null &&
-              currentDay >= prevDay &&
-              currentDay < s.untilDay;
+              currentDay !== null && currentDay < s.untilDay &&
+              (currentDay >= (STAGES[STAGES.indexOf(s) - 1]?.untilDay ?? 0));
             return (
               <div
                 key={s.untilDay}
-                className={cn(
-                  "flex flex-col gap-1.5 px-1",
-                  idx > 0 && "border-l border-[--color-rule]",
-                  idx > 0 && "pl-3",
-                  idx < STAGES.length - 1 && "pr-1",
-                )}
+                className={`rounded-md px-2 py-2 border text-center ${
+                  isActive
+                    ? "border-accent bg-blue-50 text-foreground"
+                    : "border-[--color-border-subtle] text-muted"
+                }`}
               >
-                <div
-                  className={cn(
-                    "module-label",
-                    isActive && "text-accent",
-                  )}
-                >
-                  {s.label}
-                </div>
-                <div
-                  className={cn(
-                    "font-mono tabular text-[15px] tracking-[-0.02em]",
-                    isActive ? "text-ink" : "text-ink-soft",
-                  )}
-                >
+                <div className="uppercase tracking-[0.08em] text-[10px]">{s.label}</div>
+                <div className="font-mono tabular text-sm mt-0.5 text-foreground">
                   {s.max}/dag
                 </div>
               </div>
@@ -133,18 +101,20 @@ export function WarmupProgress({
         </div>
 
         {nextStage && currentDay !== null && !overridden && (
-          <div className="text-[12px] text-ink-muted flex justify-between pt-4 border-t border-[--color-rule] font-mono tabular">
+          <div className="text-xs text-muted flex justify-between pt-1">
             <span>
-              Volgende stap →{" "}
-              <span className="text-ink font-medium">{nextStage.max}/dag</span>
+              Volgende stap: <span className="text-foreground font-medium">{nextStage.max}/dag</span>{" "}
+              over {nextStage.untilDay - currentDay} dag
+              {nextStage.untilDay - currentDay === 1 ? "" : "en"}
             </span>
-            <span>
-              over {nextStage.untilDay - currentDay}{" "}
-              {nextStage.untilDay - currentDay === 1 ? "dag" : "dagen"}
-            </span>
+            {startDate && (
+              <span className="font-mono tabular">
+                start {new Date(startDate).toLocaleDateString("nl-BE")}
+              </span>
+            )}
           </div>
         )}
       </div>
-    </section>
+    </Card>
   );
 }

@@ -18,7 +18,7 @@ function stageLabel(stage: string, day: number | null): string {
   if (stage === "not_started") return "niet gestart";
   if (stage === "override") return "override actief";
   if (stage === "full_capacity") return "volle capaciteit";
-  if (day !== null) return `week ${Math.floor(day / 7)} — dag ${day}`;
+  if (day !== null) return `week ${Math.floor(day / 7)} · dag ${day}`;
   return stage;
 }
 
@@ -43,50 +43,48 @@ export function StatusStripe({
   const sendLabel = sendEnabled
     ? "Send actief"
     : pausedReason
-      ? `Gepauzeerd · ${pausedReason}`
+      ? `Gepauzeerd: ${pausedReason}`
       : "Send uit";
 
   return (
-    <section className="bg-surface border border-[--color-rule] rounded-[2px]">
-      <div className="flex items-center justify-between px-6 py-3 border-b border-[--color-rule]">
-        <div className="flex items-center gap-2.5">
+    <section className="rounded-xl border border-card-border bg-card">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-[--color-border-subtle]">
+        <div className="flex items-center gap-2">
           <StatusDot variant={sendVariant} pulse={!sendEnabled} />
-          <span className="text-[13px] text-ink font-medium">{sendLabel}</span>
+          <span className="text-sm font-medium text-foreground">{sendLabel}</span>
         </div>
-        <div className="module-label">§ 01 — systeem</div>
+        <span className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+          Live status
+        </span>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-[--color-rule]">
-        <div className="p-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-[--color-border-subtle]">
+        <div className="p-5">
           <MetricTile
-            label="Warmup cap"
+            label="Warmup"
             value={warmupCap}
             unit="/dag"
             hint={stageLabel(warmupStage, warmupDay)}
           />
         </div>
-        <div className="p-6">
+        <div className="p-5">
           <MetricTile
-            label="Vandaag verstuurd"
+            label="Verstuurd vandaag"
             value={sentToday}
             unit={`/ ${warmupCap}`}
             hint={sentToday >= warmupCap ? "cap bereikt" : "binnen cap"}
             accent={sentToday >= warmupCap ? "warning" : "default"}
           />
         </div>
-        <div className="p-6">
+        <div className="p-5">
           <MetricTile
             label="Pending review"
             value={pendingReview}
-            hint={
-              pendingReview === 0
-                ? "alles beoordeeld"
-                : `${approvedQueue} approved in queue`
-            }
+            hint={pendingReview === 0 ? "alles beoordeeld" : `${approvedQueue} approved wacht op send`}
             accent={pendingReview > 30 ? "warning" : "default"}
           />
         </div>
-        <div className="p-6">
+        <div className="p-5">
           <MetricTile
             label="Budget"
             value={`€${budgetSpentEur.toFixed(2)}`}
@@ -95,7 +93,7 @@ export function StatusStripe({
             accent={budgetAccent}
           />
         </div>
-        <div className="p-6">
+        <div className="p-5">
           <MetricTile
             label="Warmup dag"
             value={warmupDay ?? "—"}
