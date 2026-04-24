@@ -138,6 +138,7 @@ export const businesses = pgTable(
     sector: text('sector'),  // sector gebruikt bij import (beauty, horeca, bouw, etc.)
     chainWarning: text('chain_warning'),  // reden waarom dit mogelijk een keten is, null = geen warning
     leadTemperature: text('lead_temperature').default('cold').notNull(), // 'cold' | 'warm'
+    autoPromotedAt: timestamp('auto_promoted_at'), // set door auto-promote step; null = nooit auto-gepromoot. Respecteert handmatige Triage downgrades.
     blacklisted: boolean('blacklisted').default(false).notNull(),
     blacklistedAt: timestamp('blacklisted_at'),
     dataSource: dataSourceEnum('data_source').notNull(),
@@ -948,3 +949,24 @@ export const sequenceQueueRelations = relations(sequenceQueue, ({ one }) => ({
     references: [outreachLog.id],
   }),
 }));
+
+// ── Autonomy: Batch Run Observability ─────────────────
+// Per-cron-run record voor discover / generate-drafts / deliverability-check.
+// Unique index met partial WHERE zorgt voor idempotency bij n8n retries.
+export const batchRuns = pgTable('batch_runs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  jobType: text('job_type').notNull(),
+  runDate: date('run_date').notNull(),
+  startedAt: timestamp('started_at').defaultNow().notNull(),
+  finishedAt: timestamp('finished_at'),
+  status: text('status').default('running').notNull(),
+  inputCount: integer('input_count'),
+  outputCount: integer('output_count'),
+  skippedReasons: jsonb('skipped_reasons'),
+  errorMessage: text('error_message'),
+  costEur: numeric('cost_eur', { precision: 10, scale: 4 }),
+  metadata: jsonb('metadata'),
+}, (table) => [
+  index('batch_runs_job_date_idx').on(table.jobType, table.runDate),
+  index('batch_runs_status_idx').on(table.status),
+]);
