@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { getScoreColor, getScoreLabel } from "@/lib/scoring";
+import { getScoreColor, getScoreLabel } from "@/lib/scoring-display";
 
 interface ScoreBadgeProps {
   score: number | null;
