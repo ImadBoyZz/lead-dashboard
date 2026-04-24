@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
       bedrijfsnaam: business.name,
       sector: business.sector,
       stad: business.city,
+      street: business.street,
       naceCode: business.naceCode,
       naceDescription: business.naceDescription,
       website: business.website,

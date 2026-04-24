@@ -19,6 +19,7 @@ export interface OutreachContext {
   bedrijfsnaam: string;
   sector: string | null;
   stad: string | null;
+  street: string | null;  // voor demo_homepage "ik passeer langs X-straat" hook
   naceCode: string | null;
   naceDescription: string | null;
   website: string | null;
@@ -264,10 +265,27 @@ Het aanbod is ALTIJD een gratis demo homepage. "Echte werkende site, geen mockup
 // ── Prompt generators ─────────────────────────────────
 
 export function generateOutreachPrompt(ctx: OutreachContext): { system: string; user: string } {
+  const variant: GiveFirstVariant = ctx.giveFirstVariant ?? 'control';
+
+  // Nieuwe default (Fase A): 'control' = demo_homepage pitch in Imad's eigen
+  // 7-blok WARME stijl (reverse-engineerd uit 4 echte mails). Vervangt de
+  // audit-gedreven baseline die te robotisch aanvoelde. Zie
+  // prompts-demo-homepage.ts voor de volledige prompt-logic.
+  //
+  // 'geo_rapport' en 'concurrent_vergelijking' behouden hun audit/benchmark-
+  // gedreven prompts (buildVariantBlocks hieronder) — gepauzeerd voor live
+  // assignment totdat demo_homepage als baseline is bewezen.
+  if (variant === 'control') {
+    // Lazy import om circular dependency te voorkomen (demo-homepage file
+    // importeert types uit deze file).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { buildDemoHomepagePrompt } = require('./prompts-demo-homepage') as typeof import('./prompts-demo-homepage');
+    return buildDemoHomepagePrompt(ctx);
+  }
+
   const toonInstructie = getToneInstruction(ctx.toon);
   const cluster = getClusterForNace(ctx.naceCode);
   const clusterCfg = getClusterConfig(cluster);
-  const variant: GiveFirstVariant = ctx.giveFirstVariant ?? 'control';
   const { giveFirstSection, step2WhoAmI, step3Offer } = buildVariantBlocks(variant);
 
   const blacklistLines = AI_TELL_BLACKLIST.map((t) => `  - "${t}"`).join('\n');
