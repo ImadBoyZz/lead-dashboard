@@ -32,6 +32,7 @@ import {
 import { tiebreakVisualAge } from '@/lib/enrich/website-tiebreaker';
 import { findContactEmail } from '@/lib/enrich/email-finder';
 import { FIRECRAWL_SCRAPE_COST_EUR, scrapeUrlMarkdown } from '@/lib/enrich/firecrawl';
+import { tryAutoPromote } from '@/lib/outbound/auto-promote';
 
 const HIGH_CONFIDENCE_THRESHOLD = 0.85;
 const ESTIMATED_OPUS_COST_EUR = 0.04;
@@ -109,11 +110,16 @@ export async function POST(
   // ── Stap 4: Email finder ────────────────────────────
   steps.push(await runEmailStep(business));
 
+  // ── Stap 5: Auto-promote naar warm (idempotent, criteria-based) ──
+  // Enkel als alle signalen matchen + lead niet handmatig naar cold is gezet.
+  const promote = await tryAutoPromote(business.id);
+
   return NextResponse.json({
     businessId,
     status: 'completed',
     durationMs: Date.now() - startedAt,
     steps,
+    autoPromote: promote,
   });
 }
 
