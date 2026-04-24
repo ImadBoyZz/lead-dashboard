@@ -1,0 +1,72 @@
+{
+  "name": "Daily Lead Discovery",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 5 * * 1-5" }
+          ]
+        },
+        "triggerAtMinute": 0
+      },
+      "id": "cron-05",
+      "name": "Cron 05:00 Mon-Fri",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dagelijkse rotatie van (sector, city) over een vaste tabel.\n// 5 Tier-1 sectoren × 8 hoofdsteden = 40 combinaties,\n// ~8 weken voordat we terug bij dezelfde combo zijn.\n// Jitter op city-index voorkomt dat we altijd dezelfde stad per weekdag krijgen.\n\nconst SECTORS = ['installateurs', 'vastgoed', 'medisch', 'dakwerken', 'bouw'];\nconst CITIES = ['Gent', 'Antwerpen', 'Mechelen', 'Leuven', 'Hasselt', 'Brugge', 'Kortrijk', 'Aalst'];\n\nconst now = new Date();\nconst start = new Date(Date.UTC(now.getUTCFullYear(), 0, 0));\nconst dayOfYear = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));\n\nconst sector = SECTORS[dayOfYear % SECTORS.length];\nconst city = CITIES[Math.floor(dayOfYear / SECTORS.length) % CITIES.length];\n\nreturn [{ json: { sector, city, limit: 50, dayOfYear } }];"
+      },
+      "id": "rotation",
+      "name": "Bepaal sector + city",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LEAD_DASHBOARD_URL}}/api/daily-batch/discover",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ sector: $json.sector, city: $json.city, limit: $json.limit }) }}",
+        "options": {
+          "timeout": 120000,
+          "response": { "response": { "fullResponse": false, "neverError": true } }
+        }
+      },
+      "id": "discover",
+      "name": "POST /discover",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 10000,
+      "credentials": {
+        "httpHeaderAuth": { "id": "a2eXKSzvjjZMwlFm", "name": "Lead Dashboard Bearer" }
+      }
+    }
+  ],
+  "connections": {
+    "cron-05": { "main": [[{ "node": "rotation", "type": "main", "index": 0 }]] },
+    "rotation": { "main": [[{ "node": "discover", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "_comments": {
+    "doel": "Elke werkdag 05:00 één (sector, city) combinatie scrapen via Google Places. Daypart van het jaar bepaalt de index — 40 mogelijke combo's = ~8 weken rotatie.",
+    "env_vars": {
+      "LEAD_DASHBOARD_URL": "productie URL zonder trailing slash"
+    },
+    "credentials": {
+      "LEAD_DASHBOARD_BEARER": "HTTP Header Auth met Authorization: Bearer <N8N_WEBHOOK_SECRET>"
+    },
+    "idempotency": "Endpoint checkt zelf batch_runs op (sector, city, date). Retry na timeout = 200 skipped, geen dubbele Places-call.",
+    "rollout_advies": "Dag 2: trigger handmatig eerst via curl met limit=20 om flow te verifiëren. PLACES_API_MAX_CALLS tijdelijk op 50 zetten in Vercel tot cost-pattern vaststaat."
+  }
+}

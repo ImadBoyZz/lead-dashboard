@@ -1,0 +1,65 @@
+{
+  "name": "Daily Draft Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "30 7 * * 1-5" }
+          ]
+        },
+        "triggerAtMinute": 30
+      },
+      "id": "cron-07-30",
+      "name": "Cron 07:30 Mon-Fri",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LEAD_DASHBOARD_URL}}/api/daily-batch/generate-drafts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 300000,
+          "response": { "response": { "fullResponse": false, "neverError": true } }
+        }
+      },
+      "id": "generate",
+      "name": "POST /generate-drafts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 15000,
+      "credentials": {
+        "httpHeaderAuth": { "id": "a2eXKSzvjjZMwlFm", "name": "Lead Dashboard Bearer" }
+      }
+    }
+  ],
+  "connections": {
+    "cron-07-30": { "main": [[{ "node": "generate", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "_comments": {
+    "doel": "Elke werkdag 07:30 drafts genereren voor warme leads. Endpoint bepaalt zelf het aantal: warmupCap × 2 met absolute ceiling 50. 07:30 (niet 07:00) = buffer na morning-qualification 06:00 die tot ±75 min kan duren.",
+    "env_vars": {
+      "LEAD_DASHBOARD_URL": "productie URL zonder trailing slash"
+    },
+    "credentials": {
+      "LEAD_DASHBOARD_BEARER": "HTTP Header Auth met Authorization: Bearer <N8N_WEBHOOK_SECRET>"
+    },
+    "pre_flight_endpoint_gates": [
+      "isSendingPaused → 200 skipped reason=send_disabled (geen AI burn)",
+      "assertBudgetAvailable → 429 skipped reason=budget_exhausted"
+    ],
+    "cap_logic": "limit = min(warmupCap * 2, 50). Dag 6 warmup (cap 5) → 10 drafts. Week 4+ (cap 100) → 50 drafts absolute max.",
+    "rollout_advies": "Dag 5: eerst 2x handmatig curlen met `{}` body om cost-per-run te meten. /review queue daarna monitoren — als >30 pending na 3 dagen: DRAFT_CAP_MULTIPLIER in route omlaag naar 1."
+  }
+}

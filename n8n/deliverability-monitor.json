@@ -1,0 +1,103 @@
+{
+  "name": "Deliverability Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "*/30 8-21 * * *" }
+          ]
+        },
+        "triggerAtMinute": 0
+      },
+      "id": "cron-30min",
+      "name": "Cron elke 30 min 08-21",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.LEAD_DASHBOARD_URL}}/api/daily-batch/deliverability-check",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000,
+          "response": { "response": { "fullResponse": false, "neverError": true } }
+        }
+      },
+      "id": "check",
+      "name": "Deliverability check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": { "id": "a2eXKSzvjjZMwlFm", "name": "Lead Dashboard Bearer" }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "triggered-check",
+              "leftValue": "={{$json.triggered}}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-triggered",
+      "name": "If auto-pause triggered",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "5829519377",
+        "text": "=🛑 *Deliverability alert*\n\nReden: {{$json.reason}}\nDelivered: {{$json.delivered}} | Bounces: {{$json.bounces}} ({{$json.bouncePct}}%) | Complaints: {{$json.complaints}} ({{$json.complaintPct}}%)\n\nsend_enabled staat nu uit.\n{{$env.LEAD_DASHBOARD_URL}}/settings",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "telegram-backup",
+      "name": "Telegram backup alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [900, 200],
+      "credentials": {
+        "telegramApi": { "id": "163mV0mZBYXAKp1t", "name": "Telegram Bot" }
+      }
+    }
+  ],
+  "connections": {
+    "cron-30min": { "main": [[{ "node": "check", "type": "main", "index": 0 }]] },
+    "check": { "main": [[{ "node": "if-triggered", "type": "main", "index": 0 }]] },
+    "if-triggered": {
+      "main": [
+        [{ "node": "telegram-backup", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "_comments": {
+    "doel": "Elke 30 min tussen 08:00-22:00 checken of bounce% > 2% of complaint% > 0.1% over de laatste 7 dagen (min 20 delivered voor volume floor). Als drempel gehaald: endpoint flipt send_enabled + stuurt Telegram. Deze node stuurt een backup-alert voor het geval TELEGRAM env niet op Vercel staat.",
+    "env_vars": {
+      "LEAD_DASHBOARD_URL": "productie URL zonder trailing slash",
+      "TELEGRAM_CHAT_ID": "Imad's chat ID"
+    },
+    "credentials": {
+      "TELEGRAM_BOT": "Telegram Bot API token",
+      "LEAD_DASHBOARD_BEARER": "HTTP Header Auth met Authorization: Bearer <N8N_WEBHOOK_SECRET>"
+    },
+    "retry": "2 tries met 5s wacht — endpoint is idempotent (elke run is een nieuwe check), retry-storm kan geen schade doen",
+    "alternatief_zonder_telegram": "Backup Telegram node uitzetten wanneer TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID op Vercel staan"
+  }
+}
