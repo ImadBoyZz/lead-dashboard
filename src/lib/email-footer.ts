@@ -1,6 +1,8 @@
 import { buildUnsubscribeUrl } from '@/lib/unsubscribe';
 import { env } from '@/lib/env';
 
+export type FooterStyle = 'full' | 'short' | 'none';
+
 export function buildPlainTextFooter(businessId: string): string {
   const url = buildUnsubscribeUrl(businessId);
   return [
@@ -12,6 +14,22 @@ export function buildPlainTextFooter(businessId: string): string {
     'U ontvangt dit bericht op basis van gerechtvaardigd belang (AVG art. 6(1)(f))',
     'als zakelijk contact. Wenst u geen verdere berichten te ontvangen?',
     `Afmelden: ${url}`,
+  ].join('\n');
+}
+
+/**
+ * Kortere, minder bulk-achtige footer. Classifier-vriendelijker dan de volledige
+ * variant, behoudt wettelijke vereiste (identiteit zender + afmeld-link onder
+ * GDPR/DSA). Gebruikt voor warm / demo-homepage outreach waar Primary-tab
+ * placement belangrijker is dan visuele AVG-prominentie.
+ */
+export function buildShortPlainTextFooter(businessId: string): string {
+  const url = buildUnsubscribeUrl(businessId);
+  return [
+    '',
+    '',
+    `— Imad, averissolutions.be`,
+    `niet geïnteresseerd? ${url}`,
   ].join('\n');
 }
 
@@ -29,9 +47,20 @@ export function appendFooter(
   body: string,
   businessId: string,
   format: 'text' | 'html' = 'text',
+  style: FooterStyle = 'full',
 ): string {
+  // 'none' = geen zichtbare footer. Compliance leunt dan op List-Unsubscribe
+  // header (blijft altijd aanwezig via sendOutreachEmail). Gebruik met zorg:
+  // Gegevensbeschermingsautoriteit België zou kunnen vragen waarom de afmeld-
+  // link niet expliciet in de body stond. Voor warm/Primary-first outreach.
+  if (style === 'none') {
+    return body;
+  }
   if (format === 'html') {
     return `${body}${buildHtmlFooter(businessId)}`;
+  }
+  if (style === 'short') {
+    return `${body}${buildShortPlainTextFooter(businessId)}`;
   }
   return `${body}${buildPlainTextFooter(businessId)}`;
 }

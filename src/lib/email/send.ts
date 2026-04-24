@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import { env } from '@/lib/env';
 import { buildUnsubscribeUrl } from '@/lib/unsubscribe';
-import { appendFooter } from '@/lib/email-footer';
+import { appendFooter, type FooterStyle } from '@/lib/email-footer';
 import { buildOpenTrackingUrl } from '@/lib/tracking';
 
 let client: Resend | null = null;
@@ -33,6 +33,17 @@ export type SendOutreachInput = {
   // Nodig zodat de open-tracking pixel URL bekend is vóór de send call.
   outreachLogId: string;
   replyTo?: string;
+  // Deliverability opties voor warm/demo-homepage outreach waar Primary-tab
+  // placement belangrijker is dan open-tracking data.
+  //
+  // plainTextOnly=true: geen HTML body, geen tracking pixel. Mail leest als
+  // een normale 1-op-1 mail. Trade-off: opened_at wordt nooit gevuld (geen
+  // pixel fire zonder HTML).
+  //
+  // footerStyle='short': compacte 2-regelige footer i.p.v. volledige AVG blok.
+  // Behoudt wettelijke minimum (zender + afmeld-link) maar minder bulk-signal.
+  plainTextOnly?: boolean;
+  footerStyle?: FooterStyle;
 };
 
 export type SendOutreachResult = {
@@ -44,14 +55,21 @@ export async function sendOutreachEmail(
   input: SendOutreachInput,
 ): Promise<SendOutreachResult> {
   const { to, subject, body, businessId, outreachLogId } = input;
+  const plainTextOnly = input.plainTextOnly ?? false;
+  const footerStyle: FooterStyle = input.footerStyle ?? 'full';
 
   const unsubscribeUrl = buildUnsubscribeUrl(businessId);
-  const trackingUrl = buildOpenTrackingUrl(outreachLogId);
-  const trackingPixel = `<img src="${trackingUrl}" width="1" height="1" style="display:none" alt="" />`;
-  const bodyWithFooter = appendFooter(body, businessId, 'text');
-  // Pixel als laatste element van de HTML body, na footer. Email clients sluiten
-  // missing tags automatisch (we sturen geen <html>/<body> wrapper).
-  const htmlBody = `${plainTextToHtml(body)}${appendFooter('', businessId, 'html')}${trackingPixel}`;
+  const bodyWithFooter = appendFooter(body, businessId, 'text', footerStyle);
+
+  // HTML body + pixel: alleen als we NIET plaintext-only draaien. Plaintext-
+  // only haalt bulk-signals (HTML opmaak + 1x1 pixel) weg voor betere
+  // Primary-tab placement. Trade-off: geen open-tracking data.
+  let htmlBody: string | undefined;
+  if (!plainTextOnly) {
+    const trackingUrl = buildOpenTrackingUrl(outreachLogId);
+    const trackingPixel = `<img src="${trackingUrl}" width="1" height="1" style="display:none" alt="" />`;
+    htmlBody = `${plainTextToHtml(body)}${appendFooter('', businessId, 'html')}${trackingPixel}`;
+  }
 
   const from = `${env.RESEND_FROM_NAME} <${env.RESEND_FROM_EMAIL}>`;
   const replyTo = input.replyTo ?? env.RESEND_FROM_EMAIL;
@@ -62,7 +80,7 @@ export async function sendOutreachEmail(
     replyTo,
     subject,
     text: bodyWithFooter,
-    html: htmlBody,
+    ...(htmlBody !== undefined ? { html: htmlBody } : {}),
     headers: {
       'List-Unsubscribe': `<${unsubscribeUrl}>, <mailto:${env.RESEND_FROM_EMAIL}?subject=unsubscribe>`,
       'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
