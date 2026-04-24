@@ -17,10 +17,10 @@
     },
     {
       "parameters": {
-        "jsCode": "// Alleen uitvoeren op werkdagen tussen 09:00 en 17:00 Europe/Brussels.\n// Gebruik Intl om DST automatisch te respecteren.\nconst now = new Date();\nconst parts = new Intl.DateTimeFormat('nl-BE', {\n  timeZone: 'Europe/Brussels',\n  weekday: 'short',\n  hour: '2-digit',\n  hour12: false,\n}).formatToParts(now);\n\nconst dow = parts.find(p => p.type === 'weekday')?.value ?? '';\nconst hour = parseInt(parts.find(p => p.type === 'hour')?.value ?? '0', 10);\n\nconst isWeekday = ['ma', 'di', 'wo', 'do', 'vr'].includes(dow);\nconst inWindow = hour >= 9 && hour < 17;\n\nif (!isWeekday || !inWindow) {\n  return [];  // stuur workflow niet door, skip tick\n}\nreturn [{ json: { weekday: dow, hour, ok: true } }];"
+        "jsCode": "// 7/7 send window tussen 08:00 en 21:00 Europe/Brussels (alle dagen incl.\n// weekend en feestdagen). Geen dag-van-de-week restrictie.\n//\n// Uur-venster (08-21) is bewust breed maar NIET 24/7: sends om 03:00 's\n// nachts zijn een klassiek bot/bulk signal dat classifiers triggeren. Binnen\n// 13u/dag window × ticks-elke-5min = 156 ticks/dag, ruim genoeg voor cap\n// tot 100/dag.\n//\n// DST wordt automatisch afgehandeld via Europe/Brussels timezone.\nconst now = new Date();\nconst parts = new Intl.DateTimeFormat('nl-BE', {\n  timeZone: 'Europe/Brussels',\n  weekday: 'short',\n  hour: '2-digit',\n  hour12: false,\n}).formatToParts(now);\n\nconst dow = parts.find(p => p.type === 'weekday')?.value ?? '';\nconst hour = parseInt(parts.find(p => p.type === 'hour')?.value ?? '0', 10);\n\nconst inWindow = hour >= 8 && hour < 21;\n\nif (!inWindow) {\n  return [];  // buiten 08-21, skip tick\n}\nreturn [{ json: { weekday: dow, hour, ok: true } }];"
       },
       "id": "window-gate",
-      "name": "Window gate (Mon-Fri 09-17 Europe/Brussels)",
+      "name": "Window gate (7/7 08-21 Europe/Brussels)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [460, 300]
@@ -115,10 +115,10 @@
       }
     },
     "setup": [
-      "1. Importeer dit JSON bestand in n8n",
+      "1. Importeer dit JSON bestand in n8n (overschrijf bestaande Throttled Send Worker)",
       "2. Maak Credential 'Lead Dashboard Bearer' aan (HTTP Header Auth), header 'Authorization', value 'Bearer <N8N_WEBHOOK_SECRET waarde uit Vercel env>'",
       "3. Zet env var LEAD_DASHBOARD_URL op n8n instance (Settings → Environment Variables)",
-      "4. Activate de workflow. De Window Gate zorgt dat calls buiten 9-17u werkdag Europe/Brussels niet doorgaan."
+      "4. Activate de workflow. De Window Gate zorgt dat calls buiten 08-21u Europe/Brussels niet doorgaan. Draait 7/7 inclusief weekend en feestdagen."
     ]
   }
 }
