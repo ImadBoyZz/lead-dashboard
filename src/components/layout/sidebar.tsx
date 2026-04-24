@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Snowflake, Flame, KanbanSquare, Settings, FileText, Inbox } from "lucide-react";
+import { Snowflake, Flame, KanbanSquare, Settings, FileText, Inbox, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SidebarHealthDot } from "@/components/layout/sidebar-health-dot";
 
 const navigation = [
   { name: "Cold Leads", href: "/leads", icon: Snowflake },
   { name: "Warm Leads", href: "/warm", icon: Flame },
+  { name: "Autonomy", href: "/autonomy", icon: Activity },
   { name: "Review", href: "/review", icon: Inbox, badge: "pending" as const },
   { name: "Pipeline", href: "/pipeline", icon: KanbanSquare },
   { name: "Logs", href: "/logs", icon: FileText },
@@ -70,11 +72,14 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-white/10">
-        <p className="text-[10px] text-sidebar-foreground/40 uppercase tracking-wider">
-          GDPR Compliant
-        </p>
-        <p className="text-[10px] text-sidebar-foreground/30 mt-0.5">v1.0</p>
+      <div className="p-4 border-t border-white/10 space-y-2">
+        <SidebarHealthDot />
+        <div>
+          <p className="text-[10px] text-sidebar-foreground/40 uppercase tracking-wider">
+            GDPR Compliant
+          </p>
+          <p className="text-[10px] text-sidebar-foreground/30 mt-0.5">v1.0</p>
+        </div>
       </div>
     </aside>
   );
