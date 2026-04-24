@@ -17,7 +17,6 @@ import { WarmupProgress } from "./warmup-progress";
 import { BudgetGauge } from "./budget-gauge";
 import { Timeline7d } from "./timeline-7d";
 import { BatchRunsFeed } from "./batch-runs-feed";
-import { Card } from "@/components/ui/card";
 
 function startOfToday(): Date {
   const d = new Date();
@@ -43,11 +42,8 @@ export default async function AutonomyPage() {
     getWarmupStatus(),
     getTodayBudgetStatus(),
     isSendingPaused(),
-    // sent today
     db
-      .select({
-        count: dsql<number>`COUNT(*)::int`,
-      })
+      .select({ count: dsql<number>`COUNT(*)::int` })
       .from(schema.outreachLog)
       .where(
         and(
@@ -55,18 +51,14 @@ export default async function AutonomyPage() {
           eq(schema.outreachLog.channel, "email"),
         )!,
       ),
-    // draft queue counts (pending + approved)
     db
       .select({
         status: schema.outreachDrafts.status,
         count: dsql<number>`COUNT(*)::int`,
       })
       .from(schema.outreachDrafts)
-      .where(
-        dsql`${schema.outreachDrafts.status} IN ('pending', 'approved')`,
-      )
+      .where(dsql`${schema.outreachDrafts.status} IN ('pending', 'approved')`)
       .groupBy(schema.outreachDrafts.status),
-    // rolling 7d deliverability
     db.execute<{
       delivered: string | number;
       bounces: string | number;
@@ -79,7 +71,6 @@ export default async function AutonomyPage() {
       FROM outreach_log
       WHERE contacted_at >= NOW() - INTERVAL '7 days'
     `),
-    // bounces per day (7d)
     db.execute<{ date: string; count: string | number }>(dsql`
       SELECT
         TO_CHAR(date_trunc('day', contacted_at), 'YYYY-MM-DD') AS date,
@@ -90,7 +81,6 @@ export default async function AutonomyPage() {
       GROUP BY 1
       ORDER BY 1
     `),
-    // last 7 daily_batches
     db
       .select({
         runDate: schema.dailyBatches.runDate,
@@ -100,9 +90,13 @@ export default async function AutonomyPage() {
         costEur: schema.dailyBatches.costEur,
       })
       .from(schema.dailyBatches)
-      .where(gte(schema.dailyBatches.runDate, sevenDaysAgo.toISOString().slice(0, 10)))
+      .where(
+        gte(
+          schema.dailyBatches.runDate,
+          sevenDaysAgo.toISOString().slice(0, 10),
+        ),
+      )
       .orderBy(schema.dailyBatches.runDate),
-    // today's cost by endpoint
     db
       .select({
         endpoint: schema.aiUsageLog.endpoint,
@@ -164,11 +158,12 @@ export default async function AutonomyPage() {
   return (
     <>
       <Header
+        module="02"
         title="Autonomy"
-        description="Controle-paneel voor de autonome cold-outbound cyclus"
+        description="Controle-paneel voor de autonome cold-outbound cyclus. Alles wat hier gebeurt is zichtbaar en stopbaar."
       />
 
-      <div className="space-y-6 pb-12">
+      <div className="space-y-4">
         <StatusStripe
           sendEnabled={!pause.paused}
           pausedReason={pause.reason ?? null}
@@ -191,7 +186,7 @@ export default async function AutonomyPage() {
           minVolumeMet={minVolumeMet}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
           <div className="lg:col-span-3">
             <WarmupProgress
               startDate={warmup.startDate}
@@ -212,17 +207,20 @@ export default async function AutonomyPage() {
 
         <Timeline7d rows={timelineRows} bouncesByDate={bouncesByDate} />
 
-        <Card className="!p-0 overflow-hidden">
-          <div className="px-6 py-4 border-b border-[--color-border-subtle]">
-            <h3 className="text-base font-semibold text-foreground">Cron runs</h3>
-            <p className="text-sm text-muted mt-0.5">
-              Live feed van alle autonomy jobs (discover, generate, deliverability). 30s refresh.
+        <section className="bg-surface border border-[--color-rule] rounded-[2px]">
+          <header className="px-6 pt-5 pb-4 border-b border-[--color-rule]">
+            <div className="module-label mb-1.5">§ 06 — cron feed</div>
+            <h2 className="text-[15px] leading-[1.3] font-medium text-ink tracking-[-0.01em]">
+              Recent runs
+            </h2>
+            <p className="text-[12.5px] text-ink-muted mt-1 leading-[1.5]">
+              Elke autonomy job logt hier — discover, generate, deliverability, qualification. Klik een rij open voor metadata.
             </p>
-          </div>
-          <div className="px-6 py-4">
+          </header>
+          <div className="px-6 py-5">
             <BatchRunsFeed />
           </div>
-        </Card>
+        </section>
       </div>
     </>
   );

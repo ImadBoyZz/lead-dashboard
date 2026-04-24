@@ -1,4 +1,3 @@
-import { Card } from "@/components/ui/card";
 import { MetricTile } from "@/components/ui/metric-tile";
 import { StatusDot } from "@/components/ui/status-dot";
 import { KillSwitchToggle } from "./kill-switch-toggle";
@@ -41,67 +40,89 @@ export function DeliverabilityPanel({
         : "success";
 
   return (
-    <Card className="!p-0 overflow-hidden">
-      <div className="px-6 py-4 border-b border-[--color-border-subtle]">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-semibold text-foreground">Deliverability</h3>
-            <p className="text-sm text-muted mt-0.5">
-              Rolling 7 dagen · drempel auto-pause bij {BOUNCE_THRESHOLD}% bounce of{" "}
-              {COMPLAINT_THRESHOLD}% complaint
+    <section className="bg-surface border border-[--color-rule] rounded-[2px]">
+      <header className="px-6 pt-5 pb-4 border-b border-[--color-rule]">
+        <div className="flex items-start justify-between gap-6">
+          <div className="flex-1 min-w-0">
+            <div className="module-label mb-1.5">§ 02 — deliverability</div>
+            <h2 className="text-[15px] leading-[1.3] font-medium text-ink tracking-[-0.01em]">
+              Rolling 7 dagen
+            </h2>
+            <p className="text-[12.5px] text-ink-muted mt-1 leading-[1.5]">
+              Auto-pause bij {BOUNCE_THRESHOLD}% bounce of {COMPLAINT_THRESHOLD}% complaint,
+              met minimum-volume floor van {MIN_VOLUME} delivered.
             </p>
           </div>
           {!minVolumeMet && (
-            <span className="text-[11px] text-muted-foreground uppercase tracking-[0.08em]">
-              Min-volume floor · {delivered}/{MIN_VOLUME}
-            </span>
+            <div className="shrink-0 text-right">
+              <div className="module-label">Min-volume floor</div>
+              <div className="font-mono tabular text-[13px] text-ink-muted mt-0.5">
+                {delivered} / {MIN_VOLUME}
+              </div>
+            </div>
           )}
         </div>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-3 divide-x divide-[--color-border-subtle]">
-        <div className="p-5">
+      <div className="grid grid-cols-3 divide-x divide-[--color-rule]">
+        <div className="p-6">
           <MetricTile
             label="Delivered"
             value={delivered}
-            hint={minVolumeMet ? "telling actief" : `nog ${Math.max(0, MIN_VOLUME - delivered)} tot drempels werken`}
+            hint={
+              minVolumeMet
+                ? "drempels actief"
+                : `nog ${Math.max(0, MIN_VOLUME - delivered)} tot drempels werken`
+            }
           />
         </div>
-        <div className="p-5">
+        <div className="p-6">
           <MetricTile
             label="Bounce rate"
             value={`${bouncePct.toFixed(2)}%`}
             hint={`${bounces} bounces`}
-            accent={bounceVariant === "danger" ? "danger" : bounceVariant === "warning" ? "warning" : "default"}
+            accent={
+              bounceVariant === "danger"
+                ? "danger"
+                : bounceVariant === "warning"
+                  ? "warning"
+                  : "default"
+            }
           />
-          <div className="mt-2">
+          <div className="mt-3">
             <StatusDot
               variant={bounceVariant}
               label={
                 !minVolumeMet
                   ? "onder minimum volume"
                   : bouncePct > BOUNCE_THRESHOLD && bounces >= 3
-                    ? "auto-pause drempel bereikt"
+                    ? "drempel bereikt"
                     : "binnen marge"
               }
             />
           </div>
         </div>
-        <div className="p-5">
+        <div className="p-6">
           <MetricTile
             label="Complaint rate"
             value={`${complaintPct.toFixed(3)}%`}
             hint={`${complaints} klachten`}
-            accent={complaintVariant === "danger" ? "danger" : complaintVariant === "warning" ? "warning" : "default"}
+            accent={
+              complaintVariant === "danger"
+                ? "danger"
+                : complaintVariant === "warning"
+                  ? "warning"
+                  : "default"
+            }
           />
-          <div className="mt-2">
+          <div className="mt-3">
             <StatusDot
               variant={complaintVariant}
               label={
                 !minVolumeMet
                   ? "onder minimum volume"
                   : complaintPct > COMPLAINT_THRESHOLD
-                    ? "auto-pause drempel bereikt"
+                    ? "drempel bereikt"
                     : "binnen marge"
               }
             />
@@ -109,9 +130,9 @@ export function DeliverabilityPanel({
         </div>
       </div>
 
-      <div className="px-6 py-4 border-t border-[--color-border-subtle] bg-[--color-surface-hover]/40">
+      <div className="px-6 py-5 border-t border-[--color-rule] bg-[--color-surface-alt]">
         <KillSwitchToggle />
       </div>
-    </Card>
+    </section>
   );
 }

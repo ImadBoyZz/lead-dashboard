@@ -1,48 +1,105 @@
 @import "tailwindcss";
 
+/*
+ * Working Drawing — visual system
+ * Warm paper-white background + ink + burnt orange accent.
+ * Geist Sans for UI, Geist Mono for all numerics + labels.
+ * Hairline rules + numbered modules replace shadow-cards.
+ */
+
 @theme inline {
-  --color-background: #f8fafc;
-  --color-foreground: #0f172a;
+  /* Paper & ink */
+  --color-background: #faf7f2;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f5f1ea;
+  --color-surface-hover: #f0ebe2;
+  --color-ink: #18181b;
+  --color-ink-muted: #52525b;
+  --color-ink-soft: #8a8a93;
+
+  /* Rules — hairlines like technical drawings */
+  --color-rule: rgba(24, 24, 27, 0.1);
+  --color-rule-strong: rgba(24, 24, 27, 0.2);
+  --color-rule-soft: rgba(24, 24, 27, 0.06);
+
+  /* Accent — single, rare, distinctive */
+  --color-accent: #b45309;
+  --color-accent-weak: #fef3c7;
+
+  /* Status — muted not-saturated, sits well on warm paper */
+  --color-success: #3f6212;
+  --color-success-weak: #f0f4e8;
+  --color-warning: #a16207;
+  --color-warning-weak: #fef7e0;
+  --color-danger: #9f1239;
+  --color-danger-weak: #fbe9ed;
+
+  /* Legacy token aliases — keep existing Tailwind utilities working */
+  --color-foreground: #18181b;
   --color-card: #ffffff;
-  --color-card-border: #e2e8f0;
-  --color-muted: #64748b;
-  --color-muted-foreground: #94a3b8;
-  --color-accent: #2563eb;
+  --color-card-border: rgba(24, 24, 27, 0.12);
+  --color-muted: #52525b;
+  --color-muted-foreground: #8a8a93;
   --color-accent-foreground: #ffffff;
-  --color-success: #16a34a;
-  --color-warning: #d97706;
-  --color-danger: #dc2626;
-  --color-input-border: #cbd5e1;
-  --color-sidebar: #1e293b;
-  --color-sidebar-foreground: #e2e8f0;
-  --color-sidebar-hover: #334155;
-  --color-sidebar-active: #2563eb;
-  --color-surface-hover: #f1f5f9;
-  --color-border-subtle: rgba(15, 23, 42, 0.06);
-  --color-dot-glow-success: rgba(22, 163, 74, 0.22);
-  --color-dot-glow-warning: rgba(217, 119, 6, 0.22);
-  --color-dot-glow-danger: rgba(220, 38, 38, 0.22);
-  --color-dot-glow-idle: rgba(100, 116, 139, 0.2);
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+  --color-input-border: rgba(24, 24, 27, 0.18);
+  --color-sidebar: #faf7f2;
+  --color-sidebar-foreground: #18181b;
+  --color-sidebar-hover: #f0ebe2;
+  --color-sidebar-active: #18181b;
+  --color-border-subtle: rgba(24, 24, 27, 0.08);
+  --color-dot-glow-success: rgba(63, 98, 18, 0.2);
+  --color-dot-glow-warning: rgba(161, 98, 7, 0.2);
+  --color-dot-glow-danger: rgba(159, 18, 57, 0.2);
+  --color-dot-glow-idle: rgba(138, 138, 147, 0.2);
+
+  /* Typography — set at runtime by next/font in layout.tsx */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", "Menlo", monospace;
 }
 
 body {
   background: var(--color-background);
-  color: var(--color-foreground);
+  color: var(--color-ink);
   font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
 }
 
-/* Linear/Stripe observability: tabular numerics opt-in via font-mono util */
-.font-mono, .tabular {
+/* Tabulair numerieke opt-in — mono + vaste breedte voor cijfers */
+.font-mono,
+.tabular {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
-/* Respect reduced motion for status-dot pulse and feed polling transitions */
+/* Technische paper-grid als subtiele body-achtergrond — alleen merkbaar in rustige zones */
+.paper-grid {
+  background-image:
+    linear-gradient(to right, var(--color-rule-soft) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-rule-soft) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Module-label — technische tekening sectie-header */
+.module-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+}
+
+/* Horizontal hairline met optioneel label-gap */
+.hairline {
+  border-top: 1px solid var(--color-rule);
+}
+
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .motion-pulse { animation: none !important; }
-  .motion-fade-in { animation: none !important; }
+  .motion-pulse,
+  .motion-fade-in {
+    animation: none !important;
+  }
 }
 
 @keyframes motion-pulse-kf {
