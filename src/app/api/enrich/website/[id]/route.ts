@@ -125,7 +125,7 @@ export async function POST(
           await trackAiCost({
             endpoint: '/api/enrich/website/[id]:tiebreaker',
             provider: 'anthropic',
-            model: 'claude-opus-4-7',
+            model: 'claude-sonnet-4-6',
             promptTokens: tb.promptTokens,
             completionTokens: tb.completionTokens,
             costEur: tb.costEur + FIRECRAWL_SCRAPE_COST_EUR,

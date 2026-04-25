@@ -1,15 +1,18 @@
-// Opus visual-age tiebreaker. Alleen gebruikt wanneer SSL + PageSpeed niet
+// Sonnet 4.6 visual-age tiebreaker. Alleen gebruikt wanneer SSL + PageSpeed niet
 // eenduidig zijn (~20% van leads). Structured output via tool-use — scraped
 // homepage inhoud altijd in <untrusted_content> delimiters.
+//
+// Sonnet i.p.v. Opus: ~6× goedkoper (€0.009 vs €0.07 per call) bij vergelijkbare
+// markdown-judgment kwaliteit voor age detection. Past binnen €30/maand budget.
 
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '@/lib/env';
 
-const OPUS_MODEL = 'claude-opus-4-7';
+const TIEBREAKER_MODEL = 'claude-sonnet-4-6';
 
-// Opus 4.7 prijs per miljoen tokens (USD): $15 in / $75 out. €/USD = ~0.92.
-const OPUS_INPUT_COST_PER_MTOK_EUR = 15 * 0.92;
-const OPUS_OUTPUT_COST_PER_MTOK_EUR = 75 * 0.92;
+// Sonnet 4.6 prijs per miljoen tokens (USD): $3 in / $15 out. €/USD = ~0.92.
+const SONNET_INPUT_COST_PER_MTOK_EUR = 3 * 0.92;
+const SONNET_OUTPUT_COST_PER_MTOK_EUR = 15 * 0.92;
 
 export interface TiebreakerResult {
   verdict: 'outdated' | 'acceptable' | 'modern';
@@ -89,9 +92,8 @@ export async function tiebreakVisualAge(input: {
     .filter(Boolean)
     .join('\n');
 
-  // Opus 4.7 accepteert temperature niet meer — weggelaten.
   const response = await client.messages.create({
-    model: OPUS_MODEL,
+    model: TIEBREAKER_MODEL,
     max_tokens: 400,
     system: systemPrompt,
     tools: [TIEBREAKER_TOOL],
@@ -101,7 +103,7 @@ export async function tiebreakVisualAge(input: {
 
   const toolUse = response.content.find((b) => b.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {
-    throw new Error('Opus tiebreaker gaf geen tool-use response');
+    throw new Error('Sonnet tiebreaker gaf geen tool-use response');
   }
 
   const parsed = toolUse.input as {
@@ -112,8 +114,8 @@ export async function tiebreakVisualAge(input: {
   };
 
   const costEur =
-    (response.usage.input_tokens / 1_000_000) * OPUS_INPUT_COST_PER_MTOK_EUR +
-    (response.usage.output_tokens / 1_000_000) * OPUS_OUTPUT_COST_PER_MTOK_EUR;
+    (response.usage.input_tokens / 1_000_000) * SONNET_INPUT_COST_PER_MTOK_EUR +
+    (response.usage.output_tokens / 1_000_000) * SONNET_OUTPUT_COST_PER_MTOK_EUR;
 
   return {
     verdict: parsed.verdict,
