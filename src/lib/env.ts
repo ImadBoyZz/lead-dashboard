@@ -22,6 +22,9 @@ export const env = {
   AI_PROVIDER: (process.env.AI_PROVIDER ?? 'anthropic') as 'anthropic' | 'openai',
   ANTHROPIC_API_KEY: (process.env.ANTHROPIC_API_KEY ?? '').trim(),
   OPENAI_API_KEY: (process.env.OPENAI_API_KEY ?? '').trim(),
+  // Vision tiebreaker (Opus) — uitgeschakeld bij €30/maand budget. Tiebreaker-zone
+  // valt dan automatisch op 'outdated' i.p.v. AI-judgment.
+  TIEBREAKER_ENABLED: process.env.TIEBREAKER_ENABLED === 'true',
   // Gmail OAuth (trim tegen trailing newlines uit Vercel env) — blijft voor reply thread reading
   GMAIL_CLIENT_ID: (process.env.GMAIL_CLIENT_ID ?? '').trim(),
   GMAIL_CLIENT_SECRET: (process.env.GMAIL_CLIENT_SECRET ?? '').trim(),

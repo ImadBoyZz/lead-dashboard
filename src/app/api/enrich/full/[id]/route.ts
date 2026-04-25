@@ -33,6 +33,7 @@ import { tiebreakVisualAge } from '@/lib/enrich/website-tiebreaker';
 import { findContactEmail } from '@/lib/enrich/email-finder';
 import { FIRECRAWL_SCRAPE_COST_EUR, scrapeUrlMarkdown } from '@/lib/enrich/firecrawl';
 import { tryAutoPromote } from '@/lib/outbound/auto-promote';
+import { env } from '@/lib/env';
 
 const HIGH_CONFIDENCE_THRESHOLD = 0.85;
 const ESTIMATED_OPUS_COST_EUR = 0.04;
@@ -340,7 +341,13 @@ async function runWebsiteStep(
     let finalVerdict: WebsiteVerdict = initial.verdict;
     let ageEstimate: number | null = null;
 
-    if (initial.needsTiebreaker && signals.reachable) {
+    // Low-budget fallback: tiebreaker uit → conservatief 'outdated' i.p.v. AI-judgment.
+    // Sluit aan bij auto-promote criteria zodat tiebreaker-zone leads alsnog warm worden.
+    if (initial.needsTiebreaker && !env.TIEBREAKER_ENABLED) {
+      finalVerdict = 'outdated';
+    }
+
+    if (initial.needsTiebreaker && signals.reachable && env.TIEBREAKER_ENABLED) {
       const budgetOk = await hasBudgetFor(ESTIMATED_OPUS_COST_EUR + FIRECRAWL_SCRAPE_COST_EUR);
       if (budgetOk) {
         const markdown = await fetchHomepageForTiebreaker(b.website);

@@ -24,6 +24,7 @@ import {
   BudgetExceededError,
 } from '@/lib/cost-guard';
 import { authenticateSessionOrBearer } from '@/lib/webhook-auth';
+import { env } from '@/lib/env';
 
 const IDEMPOTENCY_MS = 14 * 24 * 60 * 60 * 1000; // 14 dagen
 const ESTIMATED_OPUS_COST_EUR = 0.015; // veiligheidsmarge voor budget-check
@@ -98,8 +99,15 @@ export async function POST(
   let ageEstimate: number | null = null;
   let finalReason = initial.reason;
 
-  // Tiebreaker alleen als nodig én budget ruimte is
-  if (initial.needsTiebreaker && signals.reachable) {
+  // Low-budget fallback: tiebreaker uit → conservatief 'outdated' i.p.v. AI-judgment.
+  if (initial.needsTiebreaker && !env.TIEBREAKER_ENABLED) {
+    finalVerdict = 'outdated';
+    finalReason = 'tiebreaker uit (TIEBREAKER_ENABLED=false) — conservatief outdated';
+    trail.push({ step: 'tiebreaker_skipped', reason: 'TIEBREAKER_ENABLED=false' });
+  }
+
+  // Tiebreaker alleen als nodig én budget ruimte is én feature flag aan staat
+  if (initial.needsTiebreaker && signals.reachable && env.TIEBREAKER_ENABLED) {
     const budgetOk = await hasBudgetFor(ESTIMATED_OPUS_COST_EUR + FIRECRAWL_SCRAPE_COST_EUR);
     if (!budgetOk) {
       trail.push({ step: 'tiebreaker_skipped', reason: 'budget te krap voor Opus tiebreaker' });

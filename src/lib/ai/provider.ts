@@ -24,7 +24,7 @@ interface AIProvider {
 class AnthropicProvider implements AIProvider {
   private client: Anthropic;
   readonly providerName = 'anthropic';
-  readonly modelName = 'claude-sonnet-4-20250514';
+  readonly modelName = 'claude-haiku-4-5-20251001';
 
   constructor() {
     this.client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });

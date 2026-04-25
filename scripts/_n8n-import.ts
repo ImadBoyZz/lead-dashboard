@@ -39,6 +39,9 @@ const WORKFLOWS: WorkflowFile[] = [
   { file: 'throttled-send-worker.json' },
   { file: 'morning-qualification-batch.json' },
   { file: 'daily-summary-digest.json', transform: replaceTelegramWithEmail },
+  { file: 'daily-lead-discovery.json' },
+  { file: 'daily-draft-generation.json' },
+  { file: 'deliverability-monitor.json' },
 ];
 
 /**

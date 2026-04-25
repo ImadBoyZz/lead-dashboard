@@ -2,6 +2,7 @@
 // Opus visual-age check alleen als tiebreaker, wanneer signalen niet eenduidig zijn.
 
 import { scrapeUrlMarkdown } from './firecrawl';
+import { env } from '@/lib/env';
 
 export interface WebsiteSignals {
   reachable: boolean;
@@ -160,7 +161,10 @@ export function decideFromSignals(signals: WebsiteSignals): VerdictFromSignals {
   }
 
   if (mobile === null) {
-    // PageSpeed gaf niks — zwakke signaal, laat LLM tiebreaken
+    // PageSpeed gaf niks — bij tiebreaker uit fallback naar 'outdated' (warm-funnel doorlaat).
+    if (!env.TIEBREAKER_ENABLED) {
+      return { verdict: 'outdated', needsTiebreaker: false, reason: 'PageSpeed gaf geen score (tiebreaker disabled)' };
+    }
     return {
       verdict: 'acceptable',
       needsTiebreaker: true,
@@ -176,7 +180,10 @@ export function decideFromSignals(signals: WebsiteSignals): VerdictFromSignals {
     return { verdict: 'modern', needsTiebreaker: false, reason: `Mobile PageSpeed ${mobile}/100 + SSL` };
   }
 
-  // 30-69: tiebreaker-zone
+  // 30-69: tiebreaker-zone — als tiebreaker uit, fallback naar 'outdated' (warm-funnel doorlaat)
+  if (!env.TIEBREAKER_ENABLED) {
+    return { verdict: 'outdated', needsTiebreaker: false, reason: `Mobile ${mobile}/100 (tiebreaker disabled)` };
+  }
   return {
     verdict: 'acceptable',
     needsTiebreaker: true,
