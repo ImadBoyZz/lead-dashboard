@@ -6,7 +6,6 @@
 import { promises as dns } from 'node:dns';
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '@/lib/env';
-import { scrapeUrlMarkdown, FIRECRAWL_SCRAPE_COST_EUR } from './firecrawl';
 
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 const HAIKU_INPUT_COST_PER_MTOK_EUR = 1.0 * 0.92;
@@ -105,26 +104,28 @@ export async function findContactEmail(input: {
     return emptyResult('Ongeldige website-URL');
   }
 
-  // 1. Multi-path crawl: scrape homepage + contact paths sequentieel.
+  // 1. Multi-path crawl. Native fetch eerst (gratis), Firecrawl fallback.
   //    Stop bij eerste mailto-hit (gepubliceerd email = sterk signaal).
-  //    Anders door tot we minstens 1 email-regex hit hebben of alle paths leeg.
   const allUrls = [normalized, ...CONTACT_PATHS.map((p) => joinUrl(normalized, p))];
   const seenUrls = new Set<string>();
 
   for (const url of allUrls) {
     if (seenUrls.has(url)) continue;
     seenUrls.add(url);
-    const page = await scrapeUrlMarkdown(url, { timeoutMs: 12000 });
-    if (!page || !page.markdown) continue;
-    paths.push(url);
-    combinedMarkdown += '\n\n---\n' + page.markdown;
 
-    // Early exit zodra we een mailto-link vinden (sterk gepubliceerd signaal)
-    if (MAILTO_REGEX.test(combinedMarkdown)) {
+    // Primaire: native fetch (gratis, geen Firecrawl credits)
+    const html = await fetchRawHtml(url);
+    if (html) {
+      paths.push(url);
+      // Voor email-mining werken we direct op raw HTML — mailto-links zitten in href attributen
+      combinedMarkdown += '\n\n---\n' + html;
+
+      if (MAILTO_REGEX.test(combinedMarkdown)) {
+        MAILTO_REGEX.lastIndex = 0;
+        break;
+      }
       MAILTO_REGEX.lastIndex = 0;
-      break;
     }
-    MAILTO_REGEX.lastIndex = 0;
   }
 
   if (!combinedMarkdown) {
@@ -132,10 +133,19 @@ export async function findContactEmail(input: {
   }
 
   // 2. Regex extractie — bouwen vanuit mailto-links eerst (sterker signaal),
-  //    dan losse email-regex hits als aanvulling.
-  const mailtoHits = Array.from(combinedMarkdown.matchAll(MAILTO_REGEX)).map((m) => m[1].toLowerCase());
+  //    dan losse email-regex hits als aanvulling. Sanitize: URL-decode + trim.
+  const sanitize = (raw: string): string =>
+    decodeURIComponent(raw).trim().toLowerCase().replace(/^[<\s]+|[>\s]+$/g, '');
+  const isValidEmail = (e: string): boolean =>
+    /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(e);
+
+  const mailtoHits = Array.from(combinedMarkdown.matchAll(MAILTO_REGEX))
+    .map((m) => sanitize(m[1]))
+    .filter(isValidEmail);
   MAILTO_REGEX.lastIndex = 0;
-  const looseHits = Array.from(combinedMarkdown.matchAll(EMAIL_REGEX)).map((m) => m[0].toLowerCase());
+  const looseHits = Array.from(combinedMarkdown.matchAll(EMAIL_REGEX))
+    .map((m) => sanitize(m[0]))
+    .filter(isValidEmail);
   EMAIL_REGEX.lastIndex = 0;
   const allHits = [...mailtoHits, ...looseHits];
   const uniqueHits = Array.from(new Set(allHits)).filter((h) =>
@@ -150,7 +160,7 @@ export async function findContactEmail(input: {
   };
   let promptTokens = 0;
   let completionTokens = 0;
-  let costEur = FIRECRAWL_SCRAPE_COST_EUR * paths.length;
+  let costEur = 0; // native fetch is gratis; Haiku call telt later mee
   let source: 'firecrawl' | 'regex' | 'none' = 'none';
 
   if (env.ANTHROPIC_API_KEY) {
@@ -265,6 +275,33 @@ async function checkMx(domain: string): Promise<boolean> {
     return records.length > 0;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Native fetch zonder Firecrawl. Voor email-mining is geen JS-rendering nodig —
+ * mailto-links + tekst staan in initial HTML. Gratis, geen credits.
+ * Returnt null bij timeout / 4xx / 5xx / netwerkfout.
+ */
+async function fetchRawHtml(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: AbortSignal.timeout(8000),
+      headers: {
+        // Browser-realistische UA: Cloudflare/nginx anti-bot blocks bot-strings.
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'nl-BE,nl;q=0.9,en;q=0.8',
+      },
+    });
+    if (!res.ok) return null;
+    const body = await res.text().catch(() => '');
+    if (body.length < 200) return null;
+    return body;
+  } catch {
+    return null;
   }
 }
 
