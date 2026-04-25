@@ -46,8 +46,6 @@ export async function collectWebsiteSignals(website: string): Promise<WebsiteSig
     };
   }
 
-  const isHttps = normalized.startsWith('https://');
-
   // HEAD/GET check — volgt redirects, korte timeout.
   let reachable = false;
   let httpStatus: number | null = null;
@@ -66,7 +64,8 @@ export async function collectWebsiteSignals(website: string): Promise<WebsiteSig
     });
     httpStatus = res.status;
     reachable = res.ok;
-    hasSsl = isHttps && res.ok;
+    // Check final URL na redirects — een http-URL die redirect naar https heeft wel SSL.
+    hasSsl = res.url.startsWith('https://') && res.ok;
 
     if (res.ok) {
       const body = await res.text().catch(() => '');
