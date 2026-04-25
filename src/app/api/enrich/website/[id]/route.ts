@@ -99,10 +99,11 @@ export async function POST(
   let ageEstimate: number | null = null;
   let finalReason = initial.reason;
 
-  // Low-budget fallback: tiebreaker uit → conservatief 'outdated' i.p.v. AI-judgment.
+  // Low-budget fallback: tiebreaker uit → 'acceptable' (NIET 'outdated').
+  // Acceptable blokkeert auto-promote → twijfelgeval gaat naar manuele review.
   if (initial.needsTiebreaker && !env.TIEBREAKER_ENABLED) {
-    finalVerdict = 'outdated';
-    finalReason = 'tiebreaker uit (TIEBREAKER_ENABLED=false) — conservatief outdated';
+    finalVerdict = 'acceptable';
+    finalReason = 'tiebreaker uit (TIEBREAKER_ENABLED=false) — naar manuele review';
     trail.push({ step: 'tiebreaker_skipped', reason: 'TIEBREAKER_ENABLED=false' });
   }
 
@@ -131,14 +132,27 @@ export async function POST(
             costEur: tb.costEur + FIRECRAWL_SCRAPE_COST_EUR,
             businessId,
           });
-          finalVerdict = tb.verdict;
+          // Confidence gate: 'outdated' verdict met confidence < 0.7 → 'acceptable'.
+          // Active-maintenance signals (≥2) dwingen óók 'acceptable' ongeacht verdict.
+          let gatedVerdict = tb.verdict;
+          let gatedReason = tb.reason;
+          if (tb.verdict === 'outdated' && tb.confidence < 0.7) {
+            gatedVerdict = 'acceptable';
+            gatedReason = `low-confidence outdated (${tb.confidence.toFixed(2)}) → acceptable: ${tb.reason}`;
+          } else if (tb.verdict === 'outdated' && tb.activeMaintenanceSignals.length >= 2) {
+            gatedVerdict = 'acceptable';
+            gatedReason = `active maintenance (${tb.activeMaintenanceSignals.join(', ')}) → acceptable`;
+          }
+          finalVerdict = gatedVerdict;
           ageEstimate = tb.ageEstimateYears;
-          finalReason = tb.reason;
+          finalReason = gatedReason;
           trail.push({
             step: 'tiebreaker',
             verdict: tb.verdict,
+            gatedVerdict,
             age: tb.ageEstimateYears,
             confidence: tb.confidence,
+            activeMaintenanceSignals: tb.activeMaintenanceSignals,
             costEur: tb.costEur + FIRECRAWL_SCRAPE_COST_EUR,
           });
         }

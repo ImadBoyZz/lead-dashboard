@@ -13,6 +13,8 @@ export interface WebsiteSignals {
   parked: boolean;
   title: string | null;
   errorMessage: string | null;
+  /** Moderne tech-indicators gedetecteerd in HTML body + headers. 3+ = hard 'modern'. */
+  modernIndicators: string[];
 }
 
 // Parked-domain heuristiek: korte content + trefwoorden op parking pagina's.
@@ -26,6 +28,61 @@ const PARKED_KEYWORDS = [
   'domein is te koop',
   'gereserveerd domein',
 ];
+
+/**
+ * Detect moderne tech-fingerprints in homepage HTML + response headers.
+ * Returns lijst van gevonden markers (bv. ['next.js', 'cloudflare', 'srcset']).
+ * Bij 3+ markers wordt site geclassificeerd als 'modern' zonder LLM-call.
+ */
+function detectModernIndicators(body: string, headers: Headers): string[] {
+  const found: string[] = [];
+  const lower = body.toLowerCase();
+
+  // Modern frameworks via meta generator of script paths
+  if (/<meta[^>]+name=["']generator["'][^>]+content=["'][^"']*webflow/i.test(body)) found.push('webflow');
+  if (/<meta[^>]+name=["']generator["'][^>]+content=["'][^"']*wix/i.test(body)) found.push('wix');
+  if (/<meta[^>]+name=["']generator["'][^>]+content=["'][^"']*squarespace/i.test(body)) found.push('squarespace');
+  if (/<meta[^>]+name=["']generator["'][^>]+content=["'][^"']*shopify/i.test(body)) found.push('shopify');
+  if (/<meta[^>]+name=["']generator["'][^>]+content=["'][^"']*ghost/i.test(body)) found.push('ghost');
+  if (/\/_next\/|__next|next\.js/i.test(body)) found.push('next.js');
+  if (/_nuxt\/|nuxt\.js/i.test(body)) found.push('nuxt');
+  if (/data-react|react-root|reactroot|__react/i.test(body)) found.push('react');
+  if (/data-v-[0-9a-f]{8}|vue\.js/i.test(body)) found.push('vue');
+  if (/astro-island|data-astro/i.test(body)) found.push('astro');
+  if (/svelte-[a-z0-9]{6}/i.test(body)) found.push('svelte');
+  if (/framer\.com|framerusercontent/i.test(lower)) found.push('framer');
+
+  // Modern image handling
+  if (/srcset=/i.test(body)) found.push('srcset');
+  if (/<picture[\s>]/i.test(body)) found.push('picture-tag');
+
+  // Modern viewport + responsive
+  if (/<meta[^>]+name=["']viewport["'][^>]*width=device-width/i.test(body)) found.push('viewport-meta');
+
+  // Modern OG / structured data
+  if (/<meta[^>]+property=["']og:image/i.test(body)) found.push('og-tags');
+  if (/application\/ld\+json/i.test(body)) found.push('structured-data');
+
+  // Tailwind density (utility classes met ≥4 short tokens, ≥30 unieke voorvallen)
+  const classMatches = body.match(/class=["'][^"']{30,200}["']/gi) ?? [];
+  const tailwindLikeCount = classMatches.filter((c) => {
+    const tokens = c.replace(/^class=["']/, '').replace(/["']$/, '').split(/\s+/);
+    const utility = tokens.filter((t) => /^(flex|grid|gap-|p[xy]?-|m[xy]?-|text-|bg-|border|rounded|shadow|min-|max-|w-|h-)/i.test(t));
+    return utility.length >= 4;
+  }).length;
+  if (tailwindLikeCount >= 8) found.push('tailwind-density');
+
+  // CDN headers (modern hosting infra)
+  const server = (headers.get('server') ?? '').toLowerCase();
+  const xPoweredBy = (headers.get('x-powered-by') ?? '').toLowerCase();
+  if (headers.get('cf-ray')) found.push('cloudflare');
+  if (headers.get('x-vercel-id')) found.push('vercel');
+  if (headers.get('x-amz-cf-id') || /amazon|cloudfront/.test(server)) found.push('aws-cloudfront');
+  if (/netlify/.test(server)) found.push('netlify');
+  if (xPoweredBy.includes('next.js') && !found.includes('next.js')) found.push('next.js');
+
+  return [...new Set(found)];
+}
 
 /**
  * Collecteer basissignalen: reachable, SSL, PageSpeed mobile, parked-check.
@@ -43,6 +100,7 @@ export async function collectWebsiteSignals(website: string): Promise<WebsiteSig
       parked: false,
       title: null,
       errorMessage: 'Ongeldige URL',
+      modernIndicators: [],
     };
   }
 
@@ -54,6 +112,7 @@ export async function collectWebsiteSignals(website: string): Promise<WebsiteSig
   let contentLength = 0;
   let parked = false;
   let title: string | null = null;
+  let modernIndicators: string[] = [];
 
   try {
     const res = await fetch(normalized, {
@@ -76,6 +135,7 @@ export async function collectWebsiteSignals(website: string): Promise<WebsiteSig
       parked =
         (contentLength < 2500 && PARKED_KEYWORDS.some((k) => lower.includes(k))) ||
         PARKED_KEYWORDS.some((k) => lower.includes(k));
+      modernIndicators = detectModernIndicators(body, res.headers);
     }
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : String(err);
@@ -93,6 +153,7 @@ export async function collectWebsiteSignals(website: string): Promise<WebsiteSig
     parked,
     title,
     errorMessage,
+    modernIndicators,
   };
 }
 
@@ -147,6 +208,17 @@ export function decideFromSignals(signals: WebsiteSignals): VerdictFromSignals {
 
   if (signals.parked) {
     return { verdict: 'parked', needsTiebreaker: false, reason: 'Parked / te-koop pagina gedetecteerd' };
+  }
+
+  // Hard exclusion: 3+ moderne tech-indicators = direct 'modern', skip tiebreaker.
+  // Dit pakt Webflow/Wix/Squarespace/Next.js sites af die anders ten onrechte
+  // door PageSpeed-zone vallen (false positives zoals Rensol, Saninetto).
+  if (signals.modernIndicators.length >= 3) {
+    return {
+      verdict: 'modern',
+      needsTiebreaker: false,
+      reason: `Moderne tech gedetecteerd: ${signals.modernIndicators.join(', ')}`,
+    };
   }
 
   if (!signals.hasSsl && signals.httpStatus !== 200) {

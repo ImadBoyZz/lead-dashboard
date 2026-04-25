@@ -341,10 +341,10 @@ async function runWebsiteStep(
     let finalVerdict: WebsiteVerdict = initial.verdict;
     let ageEstimate: number | null = null;
 
-    // Low-budget fallback: tiebreaker uit → conservatief 'outdated' i.p.v. AI-judgment.
-    // Sluit aan bij auto-promote criteria zodat tiebreaker-zone leads alsnog warm worden.
+    // Low-budget fallback: tiebreaker uit → conservatief 'acceptable' (NIET 'outdated').
+    // Acceptable blokkeert auto-promote → twijfelgeval gaat naar manuele review.
     if (initial.needsTiebreaker && !env.TIEBREAKER_ENABLED) {
-      finalVerdict = 'outdated';
+      finalVerdict = 'acceptable';
     }
 
     if (initial.needsTiebreaker && signals.reachable && env.TIEBREAKER_ENABLED) {
@@ -367,7 +367,16 @@ async function runWebsiteStep(
               costEur: tb.costEur + FIRECRAWL_SCRAPE_COST_EUR,
               businessId: b.id,
             });
-            finalVerdict = tb.verdict;
+            // Confidence gate: 'outdated' verdict met lage confidence → degrade naar 'acceptable'.
+            // Voorkomt dat low-confidence calls automatisch warm worden.
+            // Ook: active-maintenance signals dwingen 'acceptable' ongeacht verdict.
+            if (tb.verdict === 'outdated' && tb.confidence < 0.7) {
+              finalVerdict = 'acceptable';
+            } else if (tb.verdict === 'outdated' && tb.activeMaintenanceSignals.length >= 2) {
+              finalVerdict = 'acceptable';
+            } else {
+              finalVerdict = tb.verdict;
+            }
             ageEstimate = tb.ageEstimateYears;
           } catch (err) {
             console.error('[full.website.tiebreaker]', err);
