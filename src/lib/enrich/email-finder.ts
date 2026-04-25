@@ -1,6 +1,7 @@
-// Email extractie uit homepage + /contact via Firecrawl + Haiku tool-use.
+// Email extractie uit homepage + meerdere contact-paths via Firecrawl + Haiku tool-use.
 // Regex sanity check voorkomt hallucinaties (email MOET in raw markdown staan).
 // MX lookup doet quick dns check voor syntax-geldig maar dood domein.
+// Multi-path crawl: probeert sequentieel /contact, /info, /over-ons enz. tot eerste hit.
 
 import { promises as dns } from 'node:dns';
 import Anthropic from '@anthropic-ai/sdk';
@@ -10,6 +11,19 @@ import { scrapeUrlMarkdown, FIRECRAWL_SCRAPE_COST_EUR } from './firecrawl';
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 const HAIKU_INPUT_COST_PER_MTOK_EUR = 1.0 * 0.92;
 const HAIKU_OUTPUT_COST_PER_MTOK_EUR = 5.0 * 0.92;
+
+// Volgorde van probability + relevance voor Belgische KMO sites.
+const CONTACT_PATHS = [
+  '/contact',
+  '/contacteer-ons',
+  '/neem-contact-op',
+  '/contact-us',
+  '/info',
+  '/over-ons',
+  '/over',
+  '/team',
+  '/about',
+];
 
 const GENERIC_MAILBOX_PATTERNS = [
   /^info@/i,
@@ -25,6 +39,17 @@ const GENERIC_MAILBOX_PATTERNS = [
 ];
 
 const EMAIL_REGEX = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+const MAILTO_REGEX = /mailto:([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/gi;
+
+// Domains/extensions die NIET als bedrijfsemail mogen tellen
+const EXCLUDE_PATTERNS = [
+  /\.(png|jpg|jpeg|gif|webp|svg)$/i,
+  /@example\./i,
+  /@domain\./i,
+  /@your-?domain\./i,
+  /@sentry\./i,
+  /@wixpress\./i,
+];
 
 export interface EmailFinderResult {
   email: string | null;
@@ -80,32 +105,42 @@ export async function findContactEmail(input: {
     return emptyResult('Ongeldige website-URL');
   }
 
-  // 1. Scrape homepage
-  const home = await scrapeUrlMarkdown(normalized, { timeoutMs: 15000 });
-  if (home) {
-    paths.push(normalized);
-    combinedMarkdown += home.markdown;
-  }
+  // 1. Multi-path crawl: scrape homepage + contact paths sequentieel.
+  //    Stop bij eerste mailto-hit (gepubliceerd email = sterk signaal).
+  //    Anders door tot we minstens 1 email-regex hit hebben of alle paths leeg.
+  const allUrls = [normalized, ...CONTACT_PATHS.map((p) => joinUrl(normalized, p))];
+  const seenUrls = new Set<string>();
 
-  // 2. Als geen email nog regex-zichtbaar, probeer /contact
-  const hasEmailInHome = EMAIL_REGEX.test(combinedMarkdown);
-  EMAIL_REGEX.lastIndex = 0; // reset regex state
-  if (!hasEmailInHome) {
-    const contactUrl = joinUrl(normalized, '/contact');
-    const contactPage = await scrapeUrlMarkdown(contactUrl, { timeoutMs: 15000 });
-    if (contactPage) {
-      paths.push(contactUrl);
-      combinedMarkdown += '\n\n---\n' + contactPage.markdown;
+  for (const url of allUrls) {
+    if (seenUrls.has(url)) continue;
+    seenUrls.add(url);
+    const page = await scrapeUrlMarkdown(url, { timeoutMs: 12000 });
+    if (!page || !page.markdown) continue;
+    paths.push(url);
+    combinedMarkdown += '\n\n---\n' + page.markdown;
+
+    // Early exit zodra we een mailto-link vinden (sterk gepubliceerd signaal)
+    if (MAILTO_REGEX.test(combinedMarkdown)) {
+      MAILTO_REGEX.lastIndex = 0;
+      break;
     }
+    MAILTO_REGEX.lastIndex = 0;
   }
 
   if (!combinedMarkdown) {
     return emptyResult('Geen content kunnen scrapen', paths);
   }
 
-  // 3. Regex fallback: als Firecrawl/Haiku iets mist, pak eerste hit uit ruwe tekst
-  const regexHits = Array.from(combinedMarkdown.matchAll(EMAIL_REGEX)).map((m) => m[0].toLowerCase());
-  const uniqueHits = Array.from(new Set(regexHits)).filter((h) => !h.endsWith('.png') && !h.endsWith('.jpg'));
+  // 2. Regex extractie — bouwen vanuit mailto-links eerst (sterker signaal),
+  //    dan losse email-regex hits als aanvulling.
+  const mailtoHits = Array.from(combinedMarkdown.matchAll(MAILTO_REGEX)).map((m) => m[1].toLowerCase());
+  MAILTO_REGEX.lastIndex = 0;
+  const looseHits = Array.from(combinedMarkdown.matchAll(EMAIL_REGEX)).map((m) => m[0].toLowerCase());
+  EMAIL_REGEX.lastIndex = 0;
+  const allHits = [...mailtoHits, ...looseHits];
+  const uniqueHits = Array.from(new Set(allHits)).filter((h) =>
+    !EXCLUDE_PATTERNS.some((p) => p.test(h)),
+  );
 
   // 4. Haiku tool-use voor primaire keuze
   let haikuResult: { email: string | null; isGeneric: boolean; reason: string } = {
@@ -171,12 +206,22 @@ export async function findContactEmail(input: {
     }
   }
 
-  // 6. Fallback: regex-first hit als Haiku niets/halucineerde
-  if (!chosen && uniqueHits.length > 0) {
-    // Prefer non-generic first; anders de eerste
-    const nonGeneric = uniqueHits.find((h) => !GENERIC_MAILBOX_PATTERNS.some((p) => p.test(h)));
-    chosen = nonGeneric ?? uniqueHits[0];
-    source = 'regex';
+  // 6. Fallback: mailto-hit eerst (gepubliceerd link = sterk signaal),
+  //    dan losse regex hit. Binnen elke groep: prefer non-generic.
+  if (!chosen) {
+    const mailtoUnique = Array.from(new Set(mailtoHits)).filter((h) =>
+      !EXCLUDE_PATTERNS.some((p) => p.test(h)),
+    );
+    const looseUnique = uniqueHits.filter((h) => !mailtoUnique.includes(h));
+
+    const pickFrom = (list: string[]): string | null => {
+      if (list.length === 0) return null;
+      const nonGeneric = list.find((h) => !GENERIC_MAILBOX_PATTERNS.some((p) => p.test(h)));
+      return nonGeneric ?? list[0];
+    };
+
+    chosen = pickFrom(mailtoUnique) ?? pickFrom(looseUnique);
+    if (chosen) source = 'regex';
   }
 
   if (!chosen) {
