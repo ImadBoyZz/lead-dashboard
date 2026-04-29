@@ -5,13 +5,13 @@
       "parameters": {
         "rule": {
           "interval": [
-            { "field": "cronExpression", "expression": "0 5 * * 1-5" }
+            { "field": "cronExpression", "expression": "0 5 * * 1,3,5" }
           ]
         },
         "triggerAtMinute": 0
       },
       "id": "cron-05",
-      "name": "Cron 05:00 Mon-Fri",
+      "name": "Cron 05:00 ma/wo/vr (3x/week budget cap)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [240, 300]

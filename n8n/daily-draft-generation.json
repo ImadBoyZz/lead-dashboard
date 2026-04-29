@@ -5,13 +5,13 @@
       "parameters": {
         "rule": {
           "interval": [
-            { "field": "cronExpression", "expression": "30 7 * * 1-5" }
+            { "field": "cronExpression", "expression": "30 7 * * *" }
           ]
         },
         "triggerAtMinute": 30
       },
       "id": "cron-07-30",
-      "name": "Cron 07:30 Mon-Fri",
+      "name": "Cron 07:30 daily (7/7)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [240, 300]
